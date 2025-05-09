@@ -80,10 +80,6 @@ app.use('/api/data', async (req, res, next) => {
     }
 }, formexRoutes);
 
-const options = {
-    key: fs.readFileSync('/path/to/key.pem'),
-    cert: fs.readFileSync('/path/to/cert.pem')
-};
 // Manejador de errores mejorado
 app.use((err, req, res, next) => {
     console.error('Error:', err);
@@ -94,12 +90,6 @@ app.use((err, req, res, next) => {
 });
 
 // Iniciar servidor con manejo de errores
-https.createServer(options, app).listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Servidor HTTPS corriendo en https://0.0.0.0:${PORT}`);
-});
-
-// Manejo de errores no capturados
-process.on('unhandledRejection', (err) => {
-    console.error('Unhandled Rejection:', err);
-    server.close(() => process.exit(1));
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Servidor API corriendo en http://0.0.0.0:${PORT}`);
 });
