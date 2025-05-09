@@ -10,14 +10,38 @@ const formexRoutes = require('./db-server/router-formex');
 const app = express();
 const PORT = process.env.PORT || 4000;
 
+// Configuración de CORS
+const corsOptions = {
+    origin: '*', // En producción, especifica los orígenes permitidos
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true
+};
+
 // Middleware
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Opciones de conexión MongoDB
+const mongooseOptions = {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+    serverSelectionTimeoutMS: 5000
+};
 
 // Conexión MongoDB para usuarios
-mongoose.connect(process.env.MONGODB_URI_USERS)
+mongoose.connect(process.env.MONGODB_URI_USERS, mongooseOptions)
     .then(() => console.log('✅ MongoDB Usuarios conectada'))
     .catch(err => console.error('Error conectando a MongoDB Usuarios:', err));
+
+// Headers de seguridad básicos
+app.use((req, res, next) => {
+    res.header('X-Content-Type-Options', 'nosniff');
+    res.header('X-Frame-Options', 'DENY');
+    res.header('X-XSS-Protection', '1; mode=block');
+    next();
+});
 
 // Rutas
 app.use('/api/auth', authRoutes);
@@ -35,13 +59,22 @@ app.use('/api/data', async (req, res, next) => {
     }
 }, formexRoutes);
 
-// Manejador de errores global
+// Manejador de errores mejorado
 app.use((err, req, res, next) => {
     console.error('Error:', err);
-    res.status(500).json({ message: 'Error interno del servidor' });
+    res.status(err.status || 500).json({
+        message: err.message || 'Error interno del servidor',
+        status: err.status || 500
+    });
 });
 
-// Iniciar servidor
-app.listen(PORT, '0.0.0.0', () => {
+// Iniciar servidor con manejo de errores
+const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Servidor API corriendo en http://0.0.0.0:${PORT}`);
+});
+
+// Manejo de errores no capturados
+process.on('unhandledRejection', (err) => {
+    console.error('Unhandled Rejection:', err);
+    server.close(() => process.exit(1));
 });
