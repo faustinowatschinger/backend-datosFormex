@@ -7,6 +7,9 @@ const mongoose = require('mongoose');
 const authRoutes = require('./auth/router-auth');
 const formexRoutes = require('./db-server/router-formex');
 
+const https = require('https');
+const fs = require('fs');
+
 const app = express();
 const PORT = process.env.PORT || 4000;
 
@@ -46,19 +49,41 @@ app.use((req, res, next) => {
 // Rutas
 app.use('/api/auth', authRoutes);
 app.use('/api/data', async (req, res, next) => {
-    if (!req.headers.authorization) {
-        return res.status(401).json({ message: 'No token provided' });
-    }
     try {
-        const token = req.headers.authorization.split(' ')[1];
+        const authHeader = req.headers.authorization;
+        console.log('Auth header received:', authHeader);
+
+        if (!authHeader) {
+            return res.status(401).json({ message: 'No token provided' });
+        }
+        
+        const token = authHeader.split(' ')[1];
+        console.log('Token being verified:', token);
+        console.log('JWT_SECRET being used:', process.env.JWT_SECRET);
+        
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        console.log('Successfully decoded token:', decoded);
+        
         req.user = decoded;
         next();
     } catch (error) {
-        return res.status(401).json({ message: 'Invalid token' });
+        console.error('Token verification failed:', {
+            name: error.name,
+            message: error.message,
+            expiredAt: error.expiredAt
+        });
+        
+        return res.status(401).json({ 
+            message: 'Invalid token',
+            error: error.message 
+        });
     }
 }, formexRoutes);
 
+const options = {
+    key: fs.readFileSync('/path/to/key.pem'),
+    cert: fs.readFileSync('/path/to/cert.pem')
+};
 // Manejador de errores mejorado
 app.use((err, req, res, next) => {
     console.error('Error:', err);
@@ -69,8 +94,8 @@ app.use((err, req, res, next) => {
 });
 
 // Iniciar servidor con manejo de errores
-const server = app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Servidor API corriendo en http://0.0.0.0:${PORT}`);
+https.createServer(options, app).listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Servidor HTTPS corriendo en https://0.0.0.0:${PORT}`);
 });
 
 // Manejo de errores no capturados
