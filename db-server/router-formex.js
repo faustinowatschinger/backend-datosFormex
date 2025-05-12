@@ -62,31 +62,37 @@ router.get('/camera/:cam/dates', async (req, res) => {
 
   res.json(results.map(r => r._id));
 });
+
+
+// GET /api/data/camera/:cam[?date=YYYY-MM-DD]
+// router-formex.js
 router.get('/camera/:cam', async (req, res) => {
   try {
-    const db = await connectMongo();
-    const cam = req.params.cam;
-    const date = req.query.date;  // "YYYY-MM-DD"
-    const col = `FormexCam${cam}`;
-
-    // ¿Existe la colección?
+    const db   = await connectMongo();
+    const cam  = req.params.cam;
+    const date = req.query.date;              // e.g. "2025-05-12"
+    const col  = `FormexCam${cam}`;
     const exists = await db.listCollections({ name: col }).hasNext();
     if (!exists) return res.status(404).json({ msg: 'Cámara no existe' });
 
     let docs;
     if (date) {
-      // Crear fechas inicio y fin del día en zona horaria local
-      const startDate = new Date(`${date}T00:00:00-03:00`);
-      const endDate = new Date(`${date}T23:59:59.999-03:00`);
-
-      console.log('Buscando datos entre:', startDate, 'y', endDate);
-
+      // agrupar sólo los docs cuyo timestamp, formateado en tu zona,
+      // coincide exactamente con el string `date`
       docs = await db.collection(col).aggregate([
         {
-          $match: {
-            timestamp: {
-              $gte: startDate,
-              $lte: endDate
+          $match:{
+            $expr: {
+              $eq:[
+                {
+                  $dateToString:{
+                    format:   "%Y-%m-%d",
+                    date:     "$timestamp",
+                    timezone: "America/Argentina/Salta"
+                  }
+                },
+                date
+              ]
             }
           }
         },
@@ -99,29 +105,7 @@ router.get('/camera/:cam', async (req, res) => {
         .toArray();
     }
 
-    // Validar y limpiar datos
-    const cleanDocs = docs.map(doc => {
-      const localDate = new Date(doc.timestamp);
-      return {
-        ...doc,
-        localHour: localDate.getHours(),
-        data: {
-          TA1: parseFloat(doc.data.TA1) || 0,
-          PF: parseFloat(doc.data.PF) || 0,
-          Hum: parseFloat(doc.data.Hum) || 0
-        }
-      };
-    });
-
-    // Debug logs
-    console.log(`Enviando ${cleanDocs.length} registros para cámara ${cam}`);
-    console.log('Rango de horas:', 
-      Math.min(...cleanDocs.map(d => d.localHour)),
-      'a',
-      Math.max(...cleanDocs.map(d => d.localHour))
-    );
-
-    res.json({ docs: cleanDocs });
+    res.json({ docs });
   } catch (e) {
     console.error(e);
     res.status(500).json({ msg: 'Error interno' });
