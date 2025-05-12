@@ -111,7 +111,21 @@ router.get('/camera/:cam', async (req, res) => {
         .toArray();
     }
 
-    res.json({ docs });
+    // Validar y limpiar datos antes de enviarlos
+    const cleanDocs = docs.map(doc => ({
+      ...doc,
+      data: {
+        TA1: parseFloat(doc.data.TA1) || 0,
+        PF: parseFloat(doc.data.PF) || 0,
+        Hum: parseFloat(doc.data.Hum) || 0
+      }
+    }));
+
+    // Añadir logs para debug
+    console.log(`Enviando ${cleanDocs.length} registros para cámara ${cam}`);
+    console.log('Muestra de datos:', cleanDocs[0]);
+
+    res.json({ docs: cleanDocs });
   } catch (e) {
     console.error(e);
     res.status(500).json({ msg: 'Error interno' });
