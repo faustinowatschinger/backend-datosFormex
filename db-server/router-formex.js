@@ -62,32 +62,35 @@ router.get('/camera/:cam/dates', async (req, res) => {
 
   res.json(results.map(r => r._id));
 });
-
-
-// GET /api/data/camera/:cam[?date=YYYY-MM-DD]
-// router-formex.js
 router.get('/camera/:cam', async (req, res) => {
   try {
     const db   = await connectMongo();
     const cam  = req.params.cam;
-    const date = req.query.date;              // e.g. "2025-05-12"
+    const date = req.query.date;         // "YYYY-MM-DD"
     const col  = `FormexCam${cam}`;
+
+    // ¿Existe la colección?
     const exists = await db.listCollections({ name: col }).hasNext();
     if (!exists) return res.status(404).json({ msg: 'Cámara no existe' });
 
     let docs;
     if (date) {
-      // agrupar sólo los docs cuyo timestamp, formateado en tu zona,
-      // coincide exactamente con el string `date`
       docs = await db.collection(col).aggregate([
+        // 1) Campo auxiliar: UTC timestamp menos 3 h
         {
-          $match:{
+          $addFields: {
+            adjTs: { $subtract: [ '$timestamp', 1000 * 60 * 60 * 3 ] }
+          }
+        },
+        // 2) Filtrar por fecha local (adjTs) igual a `date`
+        {
+          $match: {
             $expr: {
-              $eq:[
+              $eq: [
                 {
-                  $dateToString:{
+                  $dateToString: {
                     format:   "%Y-%m-%d",
-                    date:     "$timestamp",
+                    date:     "$adjTs",
                     timezone: "America/Argentina/Salta"
                   }
                 },
@@ -96,6 +99,9 @@ router.get('/camera/:cam', async (req, res) => {
             }
           }
         },
+        // 3) Quitar el campo auxiliar (opcional)
+        { $project: { adjTs: 0 } },
+        // 4) Ordenar por el timestamp real
         { $sort: { timestamp: 1 } }
       ]).toArray();
     } else {
