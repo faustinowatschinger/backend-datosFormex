@@ -65,36 +65,47 @@ router.get('/camera/:cam/dates', async (req, res) => {
 
 
 // GET /api/data/camera/:cam[?date=YYYY-MM-DD]
+// router-formex.js
 router.get('/camera/:cam', async (req, res) => {
   try {
-    const db      = await connectMongo();
-    const cam     = req.params.cam;
-    const { date } = req.query;            // opcional
-
-    const colName = `FormexCam${cam}`;
-    const exists  = await db.listCollections({ name: colName }).hasNext();
+    const db   = await connectMongo();
+    const cam  = req.params.cam;
+    const date = req.query.date;              // e.g. "2025-05-12"
+    const col  = `FormexCam${cam}`;
+    const exists = await db.listCollections({ name: col }).hasNext();
     if (!exists) return res.status(404).json({ msg: 'Cámara no existe' });
 
-    let filter = {};
+    let docs;
     if (date) {
-      // 1) inicio a 01:00 del día pedido (horas >=1)
-      const start = new Date(date);
-      start.setHours(1,0,0,0);
-      // 2) fin a 01:00 del siguiente día (incluye medianoche)
-      const end = new Date(start);
-      end.setDate(end.getDate() + 1);
-
-      filter.timestamp = { $gte: start, $lt: end };
+      // agrupar sólo los docs cuyo timestamp, formateado en tu zona,
+      // coincide exactamente con el string `date`
+      docs = await db.collection(col).aggregate([
+        {
+          $match:{
+            $expr: {
+              $eq:[
+                {
+                  $dateToString:{
+                    format:   "%Y-%m-%d",
+                    date:     "$timestamp",
+                    timezone: "America/Argentina/Salta"
+                  }
+                },
+                date
+              ]
+            }
+          }
+        },
+        { $sort: { timestamp: 1 } }
+      ]).toArray();
+    } else {
+      docs = await db.collection(col)
+        .find({})
+        .sort({ timestamp: 1 })
+        .toArray();
     }
 
-    const docs = await db
-      .collection(colName)
-      .find(filter)
-      .sort({ timestamp: 1 })
-      .toArray();
-
     res.json({ docs });
-
   } catch (e) {
     console.error(e);
     res.status(500).json({ msg: 'Error interno' });
