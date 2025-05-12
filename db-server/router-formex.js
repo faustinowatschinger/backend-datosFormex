@@ -64,10 +64,10 @@ router.get('/camera/:cam/dates', async (req, res) => {
 });
 router.get('/camera/:cam', async (req, res) => {
   try {
-    const db   = await connectMongo();
-    const cam  = req.params.cam;
-    const date = req.query.date;         // "YYYY-MM-DD"
-    const col  = `FormexCam${cam}`;
+    const db = await connectMongo();
+    const cam = req.params.cam;
+    const date = req.query.date;  // "YYYY-MM-DD"
+    const col = `FormexCam${cam}`;
 
     // ¿Existe la colección?
     const exists = await db.listCollections({ name: col }).hasNext();
@@ -75,33 +75,21 @@ router.get('/camera/:cam', async (req, res) => {
 
     let docs;
     if (date) {
+      // Crear fechas inicio y fin del día en zona horaria local
+      const startDate = new Date(`${date}T00:00:00-03:00`);
+      const endDate = new Date(`${date}T23:59:59.999-03:00`);
+
+      console.log('Buscando datos entre:', startDate, 'y', endDate);
+
       docs = await db.collection(col).aggregate([
-        // 1) Campo auxiliar: UTC timestamp menos 3 h
-        {
-          $addFields: {
-            adjTs: { $subtract: [ '$timestamp', 1000 * 60 * 60 * 3 ] }
-          }
-        },
-        // 2) Filtrar por fecha local (adjTs) igual a `date`
         {
           $match: {
-            $expr: {
-              $eq: [
-                {
-                  $dateToString: {
-                    format:   "%Y-%m-%d",
-                    date:     "$adjTs",
-                    timezone: "America/Argentina/Salta"
-                  }
-                },
-                date
-              ]
+            timestamp: {
+              $gte: startDate,
+              $lte: endDate
             }
           }
         },
-        // 3) Quitar el campo auxiliar (opcional)
-        { $project: { adjTs: 0 } },
-        // 4) Ordenar por el timestamp real
         { $sort: { timestamp: 1 } }
       ]).toArray();
     } else {
@@ -111,19 +99,27 @@ router.get('/camera/:cam', async (req, res) => {
         .toArray();
     }
 
-    // Validar y limpiar datos antes de enviarlos
-    const cleanDocs = docs.map(doc => ({
-      ...doc,
-      data: {
-        TA1: parseFloat(doc.data.TA1) || 0,
-        PF: parseFloat(doc.data.PF) || 0,
-        Hum: parseFloat(doc.data.Hum) || 0
-      }
-    }));
+    // Validar y limpiar datos
+    const cleanDocs = docs.map(doc => {
+      const localDate = new Date(doc.timestamp);
+      return {
+        ...doc,
+        localHour: localDate.getHours(),
+        data: {
+          TA1: parseFloat(doc.data.TA1) || 0,
+          PF: parseFloat(doc.data.PF) || 0,
+          Hum: parseFloat(doc.data.Hum) || 0
+        }
+      };
+    });
 
-    // Añadir logs para debug
+    // Debug logs
     console.log(`Enviando ${cleanDocs.length} registros para cámara ${cam}`);
-    console.log('Muestra de datos:', cleanDocs[0]);
+    console.log('Rango de horas:', 
+      Math.min(...cleanDocs.map(d => d.localHour)),
+      'a',
+      Math.max(...cleanDocs.map(d => d.localHour))
+    );
 
     res.json({ docs: cleanDocs });
   } catch (e) {
