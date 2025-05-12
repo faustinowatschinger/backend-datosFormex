@@ -77,38 +77,40 @@ router.get('/camera/:cam/dates', async (req, res) => {
 });
 
 // GET /api/data/camera/:cam[?date=YYYY-MM-DD]
-// router-formex.js
 router.get('/camera/:cam', async (req, res) => {
-  const db      = await connectMongo();
-  const colName = `FormexCam${req.params.cam}`;
-  const { date } = req.query;
-  if (date) {
-    // match exacto por fecha local en Salta
-    const docs = await db.collection(colName).aggregate([
-      {
-        $match: {
-          $expr: {
-            $eq: [
-              {
-                $dateToString: {
-                  format: "%Y-%m-%d",
-                  date: "$timestamp",
-                  timezone: "America/Argentina/Salta"
-                }
-              },
-              date
-            ]
-          }
-        }
-      },
-      { $sort: { timestamp: 1 } }
-    ]).toArray();
-    return res.json({ docs });
-  }
-  // sin fecha, devolvemos todo
-  const docs = await db.collection(colName).find().sort({ timestamp: 1 }).toArray();
-  res.json({ docs });
-});
+  try {
+    const db      = await connectMongo();
+    const cam     = req.params.cam;
+    const { date } = req.query;            // opcional
 
+    const colName = `FormexCam${cam}`;
+    const exists  = await db.listCollections({ name: colName }).hasNext();
+    if (!exists) return res.status(404).json({ msg: 'Cámara no existe' });
+
+    let filter = {};
+    if (date) {
+      // 1) inicio a 01:00 del día pedido (horas >=1)
+      const start = new Date(date);
+      start.setHours(1,0,0,0);
+      // 2) fin a 01:00 del siguiente día (incluye medianoche)
+      const end = new Date(start);
+      end.setDate(end.getDate() + 1);
+
+      filter.timestamp = { $gte: start, $lt: end };
+    }
+
+    const docs = await db
+      .collection(colName)
+      .find(filter)
+      .sort({ timestamp: 1 })
+      .toArray();
+
+    res.json({ docs });
+
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ msg: 'Error interno' });
+  }
+});
 
 module.exports = router;
