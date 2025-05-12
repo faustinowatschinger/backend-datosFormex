@@ -38,26 +38,53 @@ router.get('/camera/:cam/dates', async (req, res) => {
   const exists  = await db.listCollections({ name: colName }).hasNext();
   if (!exists) return res.status(404).json({ msg: 'Cámara no existe' });
 
-  const results = await db.collection(colName).aggregate([
-    // 1. Creamos adjTs = timestamp - 3h (pasa UTC→Salta)
-    {
-      $addFields: {
-        adjTs: { $subtract: [ '$timestamp', 1000 * 60 * 60 * 3 ] }
-      }
-    },
-    // 2. Agrupamos por día local (adjTs) YYYY-MM-DD
-    {
-      $group: {
-        _id: {
-          $dateToString: {
-            format:   '%Y-%m-%d',
-            date:     '$adjTs'
+  const results = await db
+    .collection(colName)
+    .aggregate([
+      // 1) Convertir cada timestamp a fecha local y extraer hora local
+      {
+        $project: {
+          dateStr: {
+            $dateToString: {
+              format: "%Y-%m-%d",
+              date: "$timestamp",
+              timezone: "America/Argentina/Salta"
+            }
+          },
+          hour: {
+            $hour: {
+              date: "$timestamp",
+              timezone: "America/Argentina/Salta"
+            }
           }
         }
-      }
-    },
-    { $sort: { '_id': 1 } }
-  ]).toArray();
+      },
+      // 2) Agrupar por fecha y calcular hora mínima y máxima
+      {
+        $group: {
+          _id: "$dateStr",
+          minHour: { $min: "$hour" },
+          maxHour: { $max: "$hour" }
+        }
+      },
+      // 3) Filtrar fechas que no sean solo hora 0
+      {
+        $match: {
+          $expr: {
+            $not: [
+              { $and: [
+                  { $eq: ["$minHour", 0] },
+                  { $eq: ["$maxHour", 0] }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      // 4) Ordenar cronológicamente
+      { $sort: { "_id": 1 } }
+    ])
+    .toArray();
 
   res.json(results.map(r => r._id));
 });
