@@ -2,22 +2,23 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 
-// Función helper para obtener la colección
-const getCollection = async (collectionName) => {
+// Función helper para obtener la base de datos Formex
+const getFormexDb = () => {
     if (!mongoose.connection || mongoose.connection.readyState !== 1) {
         throw new Error('No hay conexión activa a MongoDB');
     }
-    return mongoose.connection.db.collection(collectionName);
+    return mongoose.connection.useDb('Formex');
 };
 
 router.get('/', async (req, res) => {
     try {
-        const collections = await mongoose.connection.db.listCollections().toArray();
+        const db = getFormexDb();
+        const collections = await db.db.listCollections().toArray();
         const camarasData = [];
 
         for (const collection of collections) {
             if (collection.name.startsWith('FormexCam')) {
-                const data = await getCollection(collection.name)
+                const data = await db.collection(collection.name)
                     .find({})
                     .sort({ timestamp: -1 })
                     .limit(1)
@@ -36,20 +37,21 @@ router.get('/', async (req, res) => {
         res.json(camarasData);
     } catch (error) {
         console.error('Error fetching data:', error);
-        res.status(500).json({ error: 'Error interno del servidor' });
+        res.status(500).json({ error: error.message || 'Error interno del servidor' });
     }
 });
 
 router.get('/camera/:cam/dates', async (req, res) => {
     try {
         const colName = `FormexCam${req.params.cam}`;
-        const collection = await getCollection(colName);
+        const db = getFormexDb();
         
-        if (!collection) {
+        const exists = await db.db.listCollections({ name: colName }).hasNext();
+        if (!exists) {
             return res.status(404).json({ msg: 'Cámara no existe' });
         }
 
-        const results = await collection.aggregate([
+        const results = await db.collection(colName).aggregate([
             {
                 $project: {
                     dateStr: {
@@ -92,7 +94,7 @@ router.get('/camera/:cam/dates', async (req, res) => {
         res.json(results.map(r => r._id));
     } catch (error) {
         console.error('Error getting dates:', error);
-        res.status(500).json({ msg: 'Error interno del servidor' });
+        res.status(500).json({ msg: error.message || 'Error interno del servidor' });
     }
 });
 
@@ -101,15 +103,16 @@ router.get('/camera/:cam', async (req, res) => {
         const cam = req.params.cam;
         const date = req.query.date;
         const colName = `FormexCam${cam}`;
-        const collection = await getCollection(colName);
+        const db = getFormexDb();
 
-        if (!collection) {
+        const exists = await db.db.listCollections({ name: colName }).hasNext();
+        if (!exists) {
             return res.status(404).json({ msg: 'Cámara no existe' });
         }
 
         let docs;
         if (date) {
-            docs = await collection.aggregate([
+            docs = await db.collection(colName).aggregate([
                 {
                     $addFields: {
                         adjTs: { $subtract: ['$timestamp', 1000 * 60 * 60 * 3] }
@@ -134,7 +137,7 @@ router.get('/camera/:cam', async (req, res) => {
                 { $project: { adjTs: 0 } }
             ]).toArray();
         } else {
-            docs = await collection
+            docs = await db.collection(colName)
                 .find({})
                 .sort({ timestamp: 1 })
                 .toArray();
@@ -143,7 +146,7 @@ router.get('/camera/:cam', async (req, res) => {
         res.json({ docs });
     } catch (error) {
         console.error('Error getting camera data:', error);
-        res.status(500).json({ msg: 'Error interno del servidor' });
+        res.status(500).json({ msg: error.message || 'Error interno del servidor' });
     }
 });
 
