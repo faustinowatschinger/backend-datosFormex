@@ -76,8 +76,15 @@ app.use((err, req, res, next) => {
     });
 });
 
+let server = null;
+
 // Función para iniciar el servidor
 async function startServer() {
+    if (server) {
+        console.log('El servidor ya está corriendo');
+        return;
+    }
+
     try {
         // Conectar a ambas bases de datos
         await Promise.all([
@@ -85,8 +92,19 @@ async function startServer() {
             connectFormexDB()
         ]);
 
+        // Verificar las conexiones
+        const usersDb = mongoose.connection.useDb('users');
+        const formexDb = mongoose.connection.useDb('Formex');
+        
+        // Listar colecciones para verificar
+        const userCollections = await usersDb.db.listCollections().toArray();
+        const formexCollections = await formexDb.db.listCollections().toArray();
+        
+        console.log('📁 Colecciones en users:', userCollections.map(c => c.name));
+        console.log('📁 Colecciones en Formex:', formexCollections.map(c => c.name));
+
         // Una vez conectadas las bases de datos, iniciar el servidor
-        app.listen(PORT, '0.0.0.0', () => {
+        server = app.listen(PORT, '0.0.0.0', () => {
             console.log(`🚀 Servidor API corriendo en http://0.0.0.0:${PORT}`);
         });
     } catch (error) {
@@ -98,6 +116,10 @@ async function startServer() {
 // Manejar el cierre gracioso del servidor
 process.on('SIGINT', async () => {
     try {
+        if (server) {
+            server.close();
+            console.log('Servidor HTTP cerrado');
+        }
         await mongoose.disconnect();
         console.log('Conexiones MongoDB cerradas');
         process.exit(0);
