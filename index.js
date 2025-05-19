@@ -6,9 +6,8 @@ const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const authRoutes = require('./auth/router-auth');
 const formexRoutes = require('./db-server/router-formex');
-
-const https = require('https');
-const fs = require('fs');
+const connectUsersDB = require('./auth/db-users');
+const connectFormexDB = require('./db-server/db-formex');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -25,18 +24,6 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// Opciones de conexión MongoDB
-const mongooseOptions = {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-    serverSelectionTimeoutMS: 5000
-};
-
-// Conexión MongoDB para usuarios
-mongoose.connect(process.env.MONGODB_URI_USERS, mongooseOptions)
-    .then(() => console.log('✅ MongoDB Usuarios conectada'))
-    .catch(err => console.error('Error conectando a MongoDB Usuarios:', err));
 
 // Headers de seguridad básicos
 app.use((req, res, next) => {
@@ -89,7 +76,36 @@ app.use((err, req, res, next) => {
     });
 });
 
-// Iniciar servidor con manejo de errores
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Servidor API corriendo en http://0.0.0.0:${PORT}`);
+// Función para iniciar el servidor
+async function startServer() {
+    try {
+        // Conectar a ambas bases de datos
+        await Promise.all([
+            connectUsersDB(),
+            connectFormexDB()
+        ]);
+
+        // Una vez conectadas las bases de datos, iniciar el servidor
+        app.listen(PORT, '0.0.0.0', () => {
+            console.log(`🚀 Servidor API corriendo en http://0.0.0.0:${PORT}`);
+        });
+    } catch (error) {
+        console.error('Error fatal al iniciar el servidor:', error);
+        process.exit(1);
+    }
+}
+
+// Manejar el cierre gracioso del servidor
+process.on('SIGINT', async () => {
+    try {
+        await mongoose.disconnect();
+        console.log('Conexiones MongoDB cerradas');
+        process.exit(0);
+    } catch (err) {
+        console.error('Error al cerrar conexiones:', err);
+        process.exit(1);
+    }
 });
+
+// Iniciar el servidor
+startServer();

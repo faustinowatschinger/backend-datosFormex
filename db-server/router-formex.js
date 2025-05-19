@@ -1,16 +1,23 @@
 const express = require('express');
 const router = express.Router();
-const connectMongo = require('./mongoClient');
+const mongoose = require('mongoose');
+
+// Función helper para obtener la colección
+const getCollection = async (collectionName) => {
+    if (!mongoose.connection || mongoose.connection.readyState !== 1) {
+        throw new Error('No hay conexión activa a MongoDB');
+    }
+    return mongoose.connection.db.collection(collectionName);
+};
 
 router.get('/', async (req, res) => {
     try {
-        const db = await connectMongo();
-        const collections = await db.listCollections().toArray();
+        const collections = await mongoose.connection.db.listCollections().toArray();
         const camarasData = [];
 
         for (const collection of collections) {
             if (collection.name.startsWith('FormexCam')) {
-                const data = await db.collection(collection.name)
+                const data = await getCollection(collection.name)
                     .find({})
                     .sort({ timestamp: -1 })
                     .limit(1)
@@ -32,115 +39,112 @@ router.get('/', async (req, res) => {
         res.status(500).json({ error: 'Error interno del servidor' });
     }
 });
+
 router.get('/camera/:cam/dates', async (req, res) => {
-  const db      = await connectMongo();
-  const colName = `FormexCam${req.params.cam}`;
-  const exists  = await db.listCollections({ name: colName }).hasNext();
-  if (!exists) return res.status(404).json({ msg: 'Cámara no existe' });
+    try {
+        const colName = `FormexCam${req.params.cam}`;
+        const collection = await getCollection(colName);
+        
+        if (!collection) {
+            return res.status(404).json({ msg: 'Cámara no existe' });
+        }
 
-  const results = await db
-    .collection(colName)
-    .aggregate([
-      // 1) Convertir cada timestamp a fecha local y extraer hora local
-      {
-        $project: {
-          dateStr: {
-            $dateToString: {
-              format: "%Y-%m-%d",
-              date: "$timestamp",
-              timezone: "America/Argentina/Salta"
-            }
-          },
-          hour: {
-            $hour: {
-              date: "$timestamp",
-              timezone: "America/Argentina/Salta"
-            }
-          }
-        }
-      },
-      // 2) Agrupar por fecha y calcular hora mínima y máxima
-      {
-        $group: {
-          _id: "$dateStr",
-          minHour: { $min: "$hour" },
-          maxHour: { $max: "$hour" }
-        }
-      },
-      // 3) Filtrar fechas que no sean solo hora 0
-      {
-        $match: {
-          $expr: {
-            $not: [
-              { $and: [
-                  { $eq: ["$minHour", 0] },
-                  { $eq: ["$maxHour", 0] }
-                ]
-              }
-            ]
-          }
-        }
-      },
-      // 4) Ordenar cronológicamente
-      { $sort: { "_id": 1 } }
-    ])
-    .toArray();
+        const results = await collection.aggregate([
+            {
+                $project: {
+                    dateStr: {
+                        $dateToString: {
+                            format: "%Y-%m-%d",
+                            date: "$timestamp",
+                            timezone: "America/Argentina/Salta"
+                        }
+                    },
+                    hour: {
+                        $hour: {
+                            date: "$timestamp",
+                            timezone: "America/Argentina/Salta"
+                        }
+                    }
+                }
+            },
+            {
+                $group: {
+                    _id: "$dateStr",
+                    minHour: { $min: "$hour" },
+                    maxHour: { $max: "$hour" }
+                }
+            },
+            {
+                $match: {
+                    $expr: {
+                        $not: [
+                            { $and: [
+                                { $eq: ["$minHour", 0] },
+                                { $eq: ["$maxHour", 0] }
+                            ]}
+                        ]
+                    }
+                }
+            },
+            { $sort: { "_id": 1 } }
+        ]).toArray();
 
-  res.json(results.map(r => r._id));
+        res.json(results.map(r => r._id));
+    } catch (error) {
+        console.error('Error getting dates:', error);
+        res.status(500).json({ msg: 'Error interno del servidor' });
+    }
 });
 
-// 2) Serie del día seleccionado, también usando adjTs para el match
 router.get('/camera/:cam', async (req, res) => {
-  try {
-    const db      = await connectMongo();
-    const cam     = req.params.cam;
-    const date    = req.query.date;           // e.g. "2025-05-12"
-    const colName = `FormexCam${cam}`;
-    const exists  = await db.listCollections({ name: colName }).hasNext();
-    if (!exists) return res.status(404).json({ msg: 'Cámara no existe' });
+    try {
+        const cam = req.params.cam;
+        const date = req.query.date;
+        const colName = `FormexCam${cam}`;
+        const collection = await getCollection(colName);
 
-    let docs;
-    if (date) {
-      docs = await db.collection(colName).aggregate([
-        // 1. Ajustamos timestamp a hora local
-        {
-          $addFields: {
-            adjTs: { $subtract: [ '$timestamp', 1000 * 60 * 60 * 3 ] }
-          }
-        },
-        // 2. Filtramos sólo los que caen en `date`
-        {
-          $match: {
-            $expr: {
-              $eq: [
+        if (!collection) {
+            return res.status(404).json({ msg: 'Cámara no existe' });
+        }
+
+        let docs;
+        if (date) {
+            docs = await collection.aggregate([
                 {
-                  $dateToString: {
-                    format:   '%Y-%m-%d',
-                    date:     '$adjTs'
-                  }
+                    $addFields: {
+                        adjTs: { $subtract: ['$timestamp', 1000 * 60 * 60 * 3] }
+                    }
                 },
-                date
-              ]
-            }
-          }
-        },
-        // 3. Orden real por timestamp original
-        { $sort: { timestamp: 1 } },
-        // 4. Ya no necesitamos adjTs
-        { $project: { adjTs: 0 } }
-      ]).toArray();
-    } else {
-      docs = await db.collection(colName)
-        .find({})
-        .sort({ timestamp: 1 })
-        .toArray();
-    }
+                {
+                    $match: {
+                        $expr: {
+                            $eq: [
+                                {
+                                    $dateToString: {
+                                        format: '%Y-%m-%d',
+                                        date: '$adjTs'
+                                    }
+                                },
+                                date
+                            ]
+                        }
+                    }
+                },
+                { $sort: { timestamp: 1 } },
+                { $project: { adjTs: 0 } }
+            ]).toArray();
+        } else {
+            docs = await collection
+                .find({})
+                .sort({ timestamp: 1 })
+                .toArray();
+        }
 
-    res.json({ docs });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ msg: 'Error interno' });
-  }
+        res.json({ docs });
+    } catch (error) {
+        console.error('Error getting camera data:', error);
+        res.status(500).json({ msg: 'Error interno del servidor' });
+    }
 });
 
 module.exports = router;
