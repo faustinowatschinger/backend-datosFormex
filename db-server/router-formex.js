@@ -100,14 +100,13 @@ router.get('/camera/:cam/dates', async (req, res) => {    try {
     }
 });
 
-router.get('/camera/:cam', async (req, res) => {
-    try {
+router.get('/camera/:cam', async (req, res) => {    try {
         const cam = req.params.cam;
         const date = req.query.date;
         const colName = `FormexCam${cam}`;
         const db = getFormexDb();
 
-        const collections = await db.listCollections({ name: colName }).toArray();
+        const collections = await db.db.listCollections({ name: colName }).toArray();
         if (collections.length === 0) {
             return res.status(404).json({ msg: 'Cámara no existe' });
         }
