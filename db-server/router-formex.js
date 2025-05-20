@@ -7,13 +7,13 @@ const getFormexDb = () => {
     if (!mongoose.connection || mongoose.connection.readyState !== 1) {
         throw new Error('No hay conexión activa a MongoDB');
     }
-    return mongoose.connection.useDb('Formex');
+    return mongoose.connection.db;  // Usar directamente la base de datos actual
 };
 
 router.get('/', async (req, res) => {
     try {
         const db = getFormexDb();
-        const collections = await db.db.listCollections().toArray();
+        const collections = await db.listCollections().toArray();
         const camarasData = [];
 
         for (const collection of collections) {
@@ -32,6 +32,10 @@ router.get('/', async (req, res) => {
                     });
                 }
             }
+        }
+
+        if (camarasData.length === 0) {
+            console.log('⚠️ No se encontraron colecciones de cámaras');
         }
 
         res.json(camarasData);

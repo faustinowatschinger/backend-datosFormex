@@ -11,13 +11,12 @@ const connectDB = async () => {
     if (!uri) throw new Error('MONGODB_URI no definida');
 
     const options = {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
       serverSelectionTimeoutMS: 30000,
       socketTimeoutMS: 30000,
       connectTimeoutMS: 30000,
-      w: 'majority',  // Asegura escritura en disco
-      retryWrites: true
+      w: 'majority',
+      retryWrites: true,
+      dbName: 'Formex'  // Especificar explícitamente la base de datos
     };
 
     const conn = await mongoose.connect(uri, options);

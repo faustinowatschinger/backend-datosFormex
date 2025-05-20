@@ -3,13 +3,12 @@ const mongoose = require('mongoose');
 const connectDB = async () => {
   try {
     const options = {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
       serverSelectionTimeoutMS: 30000,
       socketTimeoutMS: 30000,
       connectTimeoutMS: 30000,
-      w: 'majority',  // Asegura escritura en disco
-      retryWrites: true
+      w: 'majority',
+      retryWrites: true,
+      dbName: 'users'  // Especificar explícitamente la base de datos
     };
 
     await mongoose.connect(process.env.MONGODB_URI_USERS, options);
