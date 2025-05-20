@@ -7,7 +7,7 @@ const getFormexDb = () => {
     if (!mongoose.connection || mongoose.connection.readyState !== 1) {
         throw new Error('No hay conexión activa a MongoDB');
     }
-    return mongoose.connection.db;  // Usar directamente la base de datos actual
+    return mongoose.connection.useDb('Formex');
 };
 
 router.get('/', async (req, res) => {
@@ -50,8 +50,8 @@ router.get('/camera/:cam/dates', async (req, res) => {
         const colName = `FormexCam${req.params.cam}`;
         const db = getFormexDb();
         
-        const exists = await db.db.listCollections({ name: colName }).hasNext();
-        if (!exists) {
+        const collections = await db.listCollections({ name: colName }).toArray();
+        if (collections.length === 0) {
             return res.status(404).json({ msg: 'Cámara no existe' });
         }
 
@@ -109,8 +109,8 @@ router.get('/camera/:cam', async (req, res) => {
         const colName = `FormexCam${cam}`;
         const db = getFormexDb();
 
-        const exists = await db.db.listCollections({ name: colName }).hasNext();
-        if (!exists) {
+        const collections = await db.listCollections({ name: colName }).toArray();
+        if (collections.length === 0) {
             return res.status(404).json({ msg: 'Cámara no existe' });
         }
 

@@ -1,10 +1,5 @@
 const mongoose = require('mongoose');
 
-// Habilitar buffering de comandos hasta que la conexión esté abierta
-mongoose.set('bufferCommands', true);
-// Extender el tiempo de buffer antes de timeout (60 s)
-mongoose.set('bufferTimeoutMS', 60000);
-
 const connectDB = async () => {
   try {
     const uri = process.env.MONGODB_URI;
@@ -14,13 +9,20 @@ const connectDB = async () => {
       serverSelectionTimeoutMS: 30000,
       socketTimeoutMS: 30000,
       connectTimeoutMS: 30000,
-      w: 'majority',
-      retryWrites: true,
-      dbName: 'Formex'  // Especificar explícitamente la base de datos
+      dbName: 'Formex',  // Especificar explícitamente el nombre de la base de datos
+      w: 'majority',     // Asegurar escritura en disco
+      retryWrites: true
     };
 
-    const conn = await mongoose.connect(uri, options);
-    console.log(`MongoDB FormEx conectado: ${conn.connection.host}`);
+    await mongoose.connect(uri, options);
+    console.log(`MongoDB FormEx conectado: ${mongoose.connection.host}`);
+
+    // Verificar la conexión creando las colecciones si no existen
+    const db = mongoose.connection.useDb('Formex');
+    
+    // Verificar colecciones existentes
+    const collections = await db.listCollections().toArray();
+    console.log('📁 Colecciones en Formex:', collections.map(c => c.name));
 
     // Manejar desconexiones
     mongoose.connection.on('disconnected', () => {
