@@ -11,9 +11,8 @@ const getFormexDb = () => {
 };
 
 router.get('/', async (req, res) => {
-    try {
-        const db = getFormexDb();
-        const collections = await db.listCollections().toArray();
+    try {        const db = getFormexDb();
+        const collections = await db.db.listCollections().toArray();
         const camarasData = [];
 
         for (const collection of collections) {
@@ -45,12 +44,11 @@ router.get('/', async (req, res) => {
     }
 });
 
-router.get('/camera/:cam/dates', async (req, res) => {
-    try {
+router.get('/camera/:cam/dates', async (req, res) => {    try {
         const colName = `FormexCam${req.params.cam}`;
         const db = getFormexDb();
         
-        const collections = await db.listCollections({ name: colName }).toArray();
+        const collections = await db.db.listCollections({ name: colName }).toArray();
         if (collections.length === 0) {
             return res.status(404).json({ msg: 'Cámara no existe' });
         }

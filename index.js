@@ -107,6 +107,8 @@ async function startServer() {
         server = app.listen(PORT, '0.0.0.0', () => {
             console.log(`🚀 Servidor API corriendo en http://0.0.0.0:${PORT}`);
         });
+
+        server.timeout = 60000; // Aumentar el timeout a 60 segundos
     } catch (error) {
         console.error('Error fatal al iniciar el servidor:', error);
         process.exit(1);

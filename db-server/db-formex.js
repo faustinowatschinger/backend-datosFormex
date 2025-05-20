@@ -15,13 +15,11 @@ const connectDB = async () => {
     };
 
     await mongoose.connect(uri, options);
-    console.log(`MongoDB FormEx conectado: ${mongoose.connection.host}`);
-
-    // Verificar la conexión creando las colecciones si no existen
+    console.log(`MongoDB FormEx conectado: ${mongoose.connection.host}`);    // Verificar la conexión creando las colecciones si no existen
     const db = mongoose.connection.useDb('Formex');
     
-    // Verificar colecciones existentes
-    const collections = await db.listCollections().toArray();
+    // Verificar colecciones existentes usando la referencia nativa de MongoDB
+    const collections = await db.db.listCollections().toArray();
     console.log('📁 Colecciones en Formex:', collections.map(c => c.name));
 
     // Manejar desconexiones
