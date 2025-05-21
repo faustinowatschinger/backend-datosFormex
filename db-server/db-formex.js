@@ -12,15 +12,20 @@ const connectDB = async () => {
       dbName: 'Formex',  // Especificar explícitamente el nombre de la base de datos
       w: 'majority',     // Asegurar escritura en disco
       retryWrites: true
-    };
-
-    await mongoose.connect(uri, options);
-    console.log(`MongoDB FormEx conectado: ${mongoose.connection.host}`);    // Verificar la conexión creando las colecciones si no existen
+    };    await mongoose.connect(uri, options);
+    console.log(`MongoDB FormEx conectado: ${mongoose.connection.host}`);
+    
+    // Verificar la conexión y listar las colecciones
     const db = mongoose.connection.useDb('Formex');
     
     // Verificar colecciones existentes usando la referencia nativa de MongoDB
     const collections = await db.db.listCollections().toArray();
-    console.log('📁 Colecciones en Formex:', collections.map(c => c.name));
+    console.log('📁 Estado inicial de la base de datos Formex:');
+    if (collections.length === 0) {
+      console.log('   → No hay colecciones. Se crearán automáticamente cuando lleguen datos.');
+    } else {
+      console.log('   → Colecciones encontradas:', collections.map(c => c.name));
+    }
 
     // Manejar desconexiones
     mongoose.connection.on('disconnected', () => {

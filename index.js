@@ -83,25 +83,12 @@ async function startServer() {
     if (server) {
         console.log('El servidor ya está corriendo');
         return;
-    }
-
-    try {
+    }    try {
         // Conectar a ambas bases de datos
         await Promise.all([
             connectUsersDB(),
             connectFormexDB()
         ]);
-
-        // Verificar las conexiones
-        const usersDb = mongoose.connection.useDb('users');
-        const formexDb = mongoose.connection.useDb('Formex');
-        
-        // Listar colecciones para verificar
-        const userCollections = await usersDb.db.listCollections().toArray();
-        const formexCollections = await formexDb.db.listCollections().toArray();
-        
-        console.log('📁 Colecciones en users:', userCollections.map(c => c.name));
-        console.log('📁 Colecciones en Formex:', formexCollections.map(c => c.name));
 
         // Una vez conectadas las bases de datos, iniciar el servidor
         server = app.listen(PORT, '0.0.0.0', () => {
