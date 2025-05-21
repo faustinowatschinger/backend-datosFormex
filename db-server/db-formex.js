@@ -3,16 +3,17 @@ const mongoose = require('mongoose');
 const connectDB = async () => {
   try {
     const uri = process.env.MONGODB_URI;
-    if (!uri) throw new Error('MONGODB_URI no definida');
-
-    const options = {
+    if (!uri) throw new Error('MONGODB_URI no definida');    const options = {
       serverSelectionTimeoutMS: 30000,
       socketTimeoutMS: 30000,
       connectTimeoutMS: 30000,
       dbName: 'Formex',  // Especificar explícitamente el nombre de la base de datos
       w: 'majority',     // Asegurar escritura en disco
-      retryWrites: true
-    };    await mongoose.connect(uri, options);
+      j: true,          // Asegurar escritura en journal
+      retryWrites: true,
+      maxPoolSize: 50,   // Tamaño máximo del pool de conexiones
+      minPoolSize: 5     // Mantener al menos 5 conexiones abiertas
+    };await mongoose.connect(uri, options);
     console.log(`MongoDB FormEx conectado: ${mongoose.connection.host}`);
     
     // Verificar la conexión y listar las colecciones
