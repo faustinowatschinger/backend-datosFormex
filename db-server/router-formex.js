@@ -51,20 +51,12 @@ router.get('/camera/:cam/dates', async (req, res) => {    try {
         const collections = await db.db.listCollections({ name: colName }).toArray();
         if (collections.length === 0) {
             return res.status(404).json({ msg: 'Cámara no existe' });
-        }
-
-        const results = await db.collection(colName).aggregate([
+        }        const results = await db.collection(colName).aggregate([
             {
                 $project: {
                     dateStr: {
                         $dateToString: {
                             format: "%Y-%m-%d",
-                            date: "$timestamp",
-                            timezone: "America/Argentina/Salta"
-                        }
-                    },
-                    hour: {
-                        $hour: {
                             date: "$timestamp",
                             timezone: "America/Argentina/Salta"
                         }
@@ -74,20 +66,12 @@ router.get('/camera/:cam/dates', async (req, res) => {    try {
             {
                 $group: {
                     _id: "$dateStr",
-                    minHour: { $min: "$hour" },
-                    maxHour: { $max: "$hour" }
+                    count: { $sum: 1 }
                 }
             },
             {
                 $match: {
-                    $expr: {
-                        $not: [
-                            { $and: [
-                                { $eq: ["$minHour", 0] },
-                                { $eq: ["$maxHour", 0] }
-                            ]}
-                        ]
-                    }
+                    count: { $gt: 0 }
                 }
             },
             { $sort: { "_id": 1 } }
@@ -112,13 +96,7 @@ router.get('/camera/:cam', async (req, res) => {    try {
         }
 
         let docs;
-        if (date) {
-            docs = await db.collection(colName).aggregate([
-                {
-                    $addFields: {
-                        adjTs: { $subtract: ['$timestamp', 1000 * 60 * 60 * 3] }
-                    }
-                },
+        if (date) {            docs = await db.collection(colName).aggregate([
                 {
                     $match: {
                         $expr: {
@@ -126,7 +104,8 @@ router.get('/camera/:cam', async (req, res) => {    try {
                                 {
                                     $dateToString: {
                                         format: '%Y-%m-%d',
-                                        date: '$adjTs'
+                                        date: '$timestamp',
+                                        timezone: 'America/Argentina/Salta'
                                     }
                                 },
                                 date
@@ -134,8 +113,7 @@ router.get('/camera/:cam', async (req, res) => {    try {
                         }
                     }
                 },
-                { $sort: { timestamp: 1 } },
-                { $project: { adjTs: 0 } }
+                { $sort: { timestamp: 1 } }
             ]).toArray();
         } else {
             docs = await db.collection(colName)
