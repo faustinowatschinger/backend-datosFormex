@@ -97,25 +97,28 @@ router.get('/camera/:cam', async (req, res) => {    try {
         if (date) {
             // Parse the date components
             const [year, month, day] = date.split('-').map(Number);
-            
-            // Create start and end of day timestamps in America/Argentina/Salta timezone
-            const startOfDay = new Date(year, month - 1, day, 0, 0, 0);
-            const endOfDay = new Date(year, month - 1, day, 23, 59, 59);
+              // Create timestamps for the complete day range
+            // Add previous day 21:00 to next day 20:59 to ensure we get all data
+            const startTime = new Date(year, month - 1, day - 1, 21, 0, 0);
+            const endTime = new Date(year, month - 1, day + 1, 20, 59, 59);
 
             docs = await db.collection(colName).aggregate([
                 {
                     $match: {
                         timestamp: {
-                            $gte: startOfDay,
-                            $lte: endOfDay
+                            $gte: startTime,
+                            $lte: endTime
                         }
                     }
                 },
+                // Ordenar por timestamp para asegurar continuidad
                 { $sort: { timestamp: 1 } }
-            ]).toArray();
-
-            // Log data points found for debugging
+            ]).toArray();            // Log cantidad de registros encontrados y rango horario
+            const hours = docs.map(d => new Date(d.timestamp).getHours());
             console.log(`📊 Encontrados ${docs.length} registros para ${colName} en ${date}`);
+            if (docs.length > 0) {
+                console.log(`   🕒 Rango horario: ${Math.min(...hours)}:00 - ${Math.max(...hours)}:59`);
+            }
         } else {
             docs = await db.collection(colName)
                 .find({})
