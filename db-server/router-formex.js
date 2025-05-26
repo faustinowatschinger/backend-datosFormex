@@ -93,37 +93,28 @@ router.get('/camera/:cam', async (req, res) => {    try {
         const collections = await db.db.listCollections({ name: colName }).toArray();
         if (collections.length === 0) {
             return res.status(404).json({ msg: 'Cámara no existe' });
-        }        let docs;
-        if (date) {
-            // Parse the date components
-            const [year, month, day] = date.split('-').map(Number);            // Crear timestamps para el día completo
-            const startTime = new Date(year, month - 1, day, 0, 0, 0);
-            const endTime = new Date(year, month - 1, day, 23, 59, 59);
+        }
 
-            docs = await db.collection(colName).aggregate([
+        let docs;
+        if (date) {            docs = await db.collection(colName).aggregate([
                 {
                     $match: {
-                        timestamp: {
-                            $gte: startTime,
-                            $lte: endTime
+                        $expr: {
+                            $eq: [
+                                {
+                                    $dateToString: {
+                                        format: '%Y-%m-%d',
+                                        date: '$timestamp',
+                                        timezone: 'America/Argentina/Salta'
+                                    }
+                                },
+                                date
+                            ]
                         }
                     }
                 },
-                { $sort: { timestamp: 1 } },
-                {
-                    $project: {
-                        _id: 1,
-                        timestamp: 1,
-                        data: 1,
-                        hour: { $hour: "$timestamp" }
-                    }
-                }
-            ]).toArray();// Log cantidad de registros encontrados y rango horario
-            const hours = docs.map(d => new Date(d.timestamp).getHours());
-            console.log(`📊 Encontrados ${docs.length} registros para ${colName} en ${date}`);
-            if (docs.length > 0) {
-                console.log(`   🕒 Rango horario: ${Math.min(...hours)}:00 - ${Math.max(...hours)}:59`);
-            }
+                { $sort: { timestamp: 1 } }
+            ]).toArray();
         } else {
             docs = await db.collection(colName)
                 .find({})
