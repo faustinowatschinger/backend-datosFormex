@@ -60,18 +60,24 @@ router.get('/camera/:cam/dates', async (req, res) => {    try {
                             date: "$timestamp",
                             timezone: "America/Argentina/Salta"
                         }
-                    }
+                    },
+                    hour: { $hour: "$timestamp" }
                 }
             },
             {
                 $group: {
                     _id: "$dateStr",
-                    count: { $sum: 1 }
+                    hoursCount: { $addToSet: "$hour" },
+                    totalCount: { $sum: 1 }
                 }
             },
             {
                 $match: {
-                    count: { $gt: 0 }
+                    $and: [
+                        { totalCount: { $gt: 1 } },  // más de un registro
+                        { "hoursCount.0": { $exists: true } },  // al menos una hora
+                        { $expr: { $gt: [{ $size: "$hoursCount" }, 1] } }  // más de una hora diferente
+                    ]
                 }
             },
             { $sort: { "_id": 1 } }
