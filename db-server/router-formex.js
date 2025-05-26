@@ -93,28 +93,29 @@ router.get('/camera/:cam', async (req, res) => {    try {
         const collections = await db.db.listCollections({ name: colName }).toArray();
         if (collections.length === 0) {
             return res.status(404).json({ msg: 'Cámara no existe' });
-        }
+        }        let docs;
+        if (date) {
+            // Parse the date components
+            const [year, month, day] = date.split('-').map(Number);
+            
+            // Create start and end of day timestamps in America/Argentina/Salta timezone
+            const startOfDay = new Date(year, month - 1, day, 0, 0, 0);
+            const endOfDay = new Date(year, month - 1, day, 23, 59, 59);
 
-        let docs;
-        if (date) {            docs = await db.collection(colName).aggregate([
+            docs = await db.collection(colName).aggregate([
                 {
                     $match: {
-                        $expr: {
-                            $eq: [
-                                {
-                                    $dateToString: {
-                                        format: '%Y-%m-%d',
-                                        date: '$timestamp',
-                                        timezone: 'America/Argentina/Salta'
-                                    }
-                                },
-                                date
-                            ]
+                        timestamp: {
+                            $gte: startOfDay,
+                            $lte: endOfDay
                         }
                     }
                 },
                 { $sort: { timestamp: 1 } }
             ]).toArray();
+
+            // Log data points found for debugging
+            console.log(`📊 Encontrados ${docs.length} registros para ${colName} en ${date}`);
         } else {
             docs = await db.collection(colName)
                 .find({})
