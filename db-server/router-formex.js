@@ -1,13 +1,14 @@
 const express = require('express');
 const router = express.Router();
-const mongoose = require('mongoose');
+const { getFormexConnection } = require('./db-formex');
 
 // Función helper para obtener la base de datos Formex
 const getFormexDb = () => {
-    if (!mongoose.connection || mongoose.connection.readyState !== 1) {
+    const conn = getFormexConnection();
+    if (!conn || conn.readyState !== 1) {
         throw new Error('No hay conexión activa a MongoDB');
     }
-    return mongoose.connection.useDb('Formex');
+    return conn.useDb('Formex');
 };
 
 router.get('/', async (req, res) => {

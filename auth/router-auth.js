@@ -2,7 +2,7 @@ const express  = require('express');
 const bcrypt   = require('bcryptjs');
 const jwt      = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
-const User     = require('./modelo-user');
+const getUserModel = require('./modelo-user');
 
 const router = express.Router();
 const saltRounds = 12;
@@ -17,6 +17,7 @@ router.post('/register',
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
     const { email, password } = req.body;
+    const User = getUserModel();
 
     // ¿Existe?
     if (await User.findOne({ email })) {
@@ -40,6 +41,7 @@ router.post('/login',
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
     const { email, password } = req.body;
+    const User = getUserModel();
     const user = await User.findOne({ email });
     if (!user || !(await user.comparePassword(password))) {
       return res.status(401).json({ msg: 'Credenciales inválidas' });
@@ -54,5 +56,5 @@ router.post('/login',
     res.json({ token });
   }
 );
-
-module.exports = router;
+ 
+ module.exports = router;

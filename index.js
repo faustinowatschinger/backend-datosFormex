@@ -6,8 +6,8 @@ const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const authRoutes = require('./auth/router-auth');
 const formexRoutes = require('./db-server/router-formex');
-const connectUsersDB = require('./auth/db-users');
-const connectFormexDB = require('./db-server/db-formex');
+const { connectUsersDB, getUsersConnection } = require('./auth/db-users');
+const { connectFormexDB, getFormexConnection } = require('./db-server/db-formex');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -109,7 +109,10 @@ process.on('SIGINT', async () => {
             server.close();
             console.log('Servidor HTTP cerrado');
         }
-        await mongoose.disconnect();
+        const usersConn = getUsersConnection();
+        const formexConn = getFormexConnection();
+        if (usersConn) await usersConn.close();
+        if (formexConn) await formexConn.close();
         console.log('Conexiones MongoDB cerradas');
         process.exit(0);
     } catch (err) {

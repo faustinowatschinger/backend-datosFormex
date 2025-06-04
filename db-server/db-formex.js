@@ -1,23 +1,30 @@
 const mongoose = require('mongoose');
 
+let formexConnection = null;
+
 const connectDB = async () => {
   try {
     const uri = process.env.MONGODB_URI;
-    if (!uri) throw new Error('MONGODB_URI no definida');    const options = {
+    if (!uri) throw new Error('MONGODB_RI no definida');
+    const options = {
       serverSelectionTimeoutMS: 30000,
       socketTimeoutMS: 30000,
       connectTimeoutMS: 30000,
       dbName: 'Formex',  // Especificar explícitamente el nombre de la base de datos
-      w: 'majority',     // Asegurar escritura en disco
-      j: true,          // Asegurar escritura en journal
+      w: 'majority',     // Asegurar escritura en disco          // Asegurar escritura en journal
+      j: true,           // Asegurar escritura en joural
       retryWrites: true,
       maxPoolSize: 50,   // Tamaño máximo del pool de conexiones
       minPoolSize: 5     // Mantener al menos 5 conexiones abiertas
-    };await mongoose.connect(uri, options);
-    console.log(`MongoDB FormEx conectado: ${mongoose.connection.host}`);
-    
+    };
+    formexConnection = await mongoose
+      .createConnection(uri, options)
+      .asPromise();
+    module.exports.formexConnection = formexConnection;
+    console.log(`MongoDB FormEx conectado: ${formexConnection.host}`);
+
     // Verificar la conexión y listar las colecciones
-    const db = mongoose.connection.useDb('Formex');
+    const db = formexConnection.useDb('Formex')
     
     // Verificar colecciones existentes usando la referencia nativa de MongoDB
     const collections = await db.db.listCollections().toArray();
@@ -29,12 +36,12 @@ const connectDB = async () => {
     }
 
     // Manejar desconexiones
-    mongoose.connection.on('disconnected', () => {
+    formexConnection.on('diconnected', () => {
       console.log('MongoDB FormEx desconectada. Intentando reconectar...');
       setTimeout(connectDB, 5000);
     });
 
-    mongoose.connection.on('error', (err) => {
+   formexConnection.on('error', (err) => {
       console.error('Error en conexión MongoDB FormEx:', err);
       setTimeout(connectDB, 5000);
     });
@@ -45,4 +52,10 @@ const connectDB = async () => {
   }
 };
 
-module.exports = connectDB;
+const getFormexConnection = () => formexConnection;
+
+module.exports = {
+  connectFormexDB: connectDB,
+  getFormexConnection,
+  formexConnection
+};
