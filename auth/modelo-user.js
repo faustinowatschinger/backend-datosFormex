@@ -20,4 +20,4 @@ userSchema.methods.comparePassword = function (plain) {
   return bcrypt.compare(plain, this.passwordHash);
 };
 
-module.exports = mongoose.model('User', userSchema, 'FormexUsers');
+module.exports = userSchema;
