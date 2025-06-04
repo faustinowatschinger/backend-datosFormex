@@ -6,7 +6,7 @@ const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const authRoutes = require('./auth/router-auth');
 const formexRoutes = require('./db-server/router-formex');
-const connectUsersDB = require('./auth/db-users');
+const { connectDB: connectUsersDB } = require('./auth/db-users');
 const connectFormexDB = require('./db-server/db-formex');
 
 const app = express();

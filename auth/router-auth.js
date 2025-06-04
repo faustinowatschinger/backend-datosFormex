@@ -2,7 +2,7 @@ const express  = require('express');
 const bcrypt   = require('bcryptjs');
 const jwt      = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
-const User     = require('./modelo-user');
+const { getUserModel } = require('./db-users');
 
 const router = express.Router();
 const saltRounds = 12;
@@ -13,6 +13,7 @@ router.post('/register',
   body('email').isEmail().normalizeEmail(),
   body('password').isLength({ min: 8 }),
   async (req, res) => {
+    const User = getUserModel();
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
@@ -36,6 +37,7 @@ router.post('/login',
   body('email').isEmail(),
   body('password').notEmpty(),
   async (req, res) => {
+    const User = getUserModel();
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
