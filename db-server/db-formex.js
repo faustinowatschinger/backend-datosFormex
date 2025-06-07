@@ -10,7 +10,7 @@ const connectDB = async () => {
       serverSelectionTimeoutMS: 30000,
       socketTimeoutMS: 30000,
       connectTimeoutMS: 30000,
-      dbName: 'Formex',  // Especificar explícitamente el nombre de la base de datos
+      dbName: 'formex',  // Especificar explícitamente el nombre de la base de datos
       w: 'majority',     // Asegurar escritura en disco          // Asegurar escritura en journal
       j: true,           // Asegurar escritura en joural
       retryWrites: true,
@@ -21,10 +21,10 @@ const connectDB = async () => {
       .createConnection(uri, options)
       .asPromise();
     module.exports.formexConnection = formexConnection;
-    console.log(`MongoDB FormEx conectado: ${formexConnection.host}`);
+    console.log(`MongoDB Formex conectado: ${formexConnection.host}`);
 
     // Verificar la conexión y listar las colecciones
-    const db = formexConnection.useDb('Formex')
+    const db = formexConnection.useDb('formex')
     
     // Verificar colecciones existentes usando la referencia nativa de MongoDB
     const collections = await db.db.listCollections().toArray();

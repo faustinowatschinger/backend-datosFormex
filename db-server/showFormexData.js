@@ -22,7 +22,7 @@ async function showFormexData() {
 
         // Mostrar usuarios primero
         console.log('\n👥 USUARIOS:');
-        const usersDb = usersClient.db('users');
+        const usersDb = usersClient.db('Users');
         const users = await usersDb.collection('FormexUsers').find({}).toArray();
         
         if (users.length === 0) {

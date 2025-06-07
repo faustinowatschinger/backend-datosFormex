@@ -13,7 +13,7 @@ const connectDB = async () => {
       retryWrites: true,
       maxPoolSize: 50,   // Tamaño máximo del pool de conexiones
       minPoolSize: 5,    // Mantener al menos 5 conexiones abiertas
-      dbName: 'users'    // Especificar explícitamente la base de datos
+      dbName: 'Users'    // Especificar explícitamente la base de datos
     };
 
     usersConnection = await mongoose

@@ -12,7 +12,7 @@ async function clearFormexData() {
         await client.connect();
         console.log('Conectado a MongoDB');
 
-        const db = client.db('Formex');
+        const db = client.db('formex');
         
         // Listar todas las colecciones
         const collections = await db.listCollections().toArray();

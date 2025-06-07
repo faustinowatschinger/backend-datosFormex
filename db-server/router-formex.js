@@ -8,7 +8,7 @@ const getFormexDb = () => {
     if (!conn || conn.readyState !== 1) {
         throw new Error('No hay conexión activa a MongoDB');
     }
-    return conn.useDb('Formex');
+    return conn.useDb('formex');
 };
 
 router.get('/', async (req, res) => {
