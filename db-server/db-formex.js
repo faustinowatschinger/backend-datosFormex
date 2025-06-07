@@ -5,7 +5,7 @@ let formexConnection = null;
 const connectDB = async () => {
   try {
     const uri = process.env.MONGODB_URI;
-    if (!uri) throw new Error('MONGODB_RI no definida');
+    if (!uri) throw new Error('MONGODB_URI no definida');
     const options = {
       serverSelectionTimeoutMS: 30000,
       socketTimeoutMS: 30000,
@@ -36,7 +36,7 @@ const connectDB = async () => {
     }
 
     // Manejar desconexiones
-    formexConnection.on('diconnected', () => {
+    formexConnection.on('disconnected', () => {
       console.log('MongoDB FormEx desconectada. Intentando reconectar...');
       setTimeout(connectDB, 5000);
     });
