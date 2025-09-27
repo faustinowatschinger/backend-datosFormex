@@ -6,6 +6,7 @@ const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const authRoutes = require('./auth/router-auth');
 const formexRoutes = require('./db-server/router-formex');
+const medicionesRoutes = require('./db-server/router-mediciones');
 const { connectUsersDB, getUsersConnection } = require('./auth/db-users');
 const { connectFormexDB, getFormexConnection } = require('./db-server/db-formex');
 
@@ -16,7 +17,7 @@ const PORT = process.env.PORT || 4000;
 const corsOptions = {
     origin: '*', // En producción, especifica los orígenes permitidos
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
     credentials: true
 };
 
@@ -35,6 +36,7 @@ app.use((req, res, next) => {
 
 // Rutas
 app.use('/api/auth', authRoutes);
+app.use('/api', medicionesRoutes); // Nuevas rutas para mediciones (sin autenticación JWT)
 app.use('/api/data', async (req, res, next) => {
     try {
         const authHeader = req.headers.authorization;

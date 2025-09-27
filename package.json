@@ -4,7 +4,13 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js",
+    "test-server": "node server-test.js",
+    "test-api": "node test-api.js",
+    "setup-mediciones": "node db-server/setup-mediciones.js",
+    "migrar-formex": "node db-server/migrar-formex.js",
+    "test-client": "node raspberry-client-example.js"
   },
   "keywords": [],
   "author": "",
@@ -18,6 +24,7 @@
     "express-validator": "^7.2.1",
     "jsonwebtoken": "^9.0.2",
     "mongodb": "^6.16.0",
-    "mongoose": "^8.14.1"
+    "mongoose": "^8.14.1",
+    "node-fetch": "^3.3.2"
   }
 }
