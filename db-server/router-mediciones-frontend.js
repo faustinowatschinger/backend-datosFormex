@@ -33,8 +33,11 @@ router.get('/mediciones', async (req, res) => {
             frigorificoId = frigorifico._id;
         }
 
-        // Agregación para obtener las cámaras con su última medición
-        const camarasData = await db.collection('mediciones').aggregate([
+        // Lista predefinida de cámaras (17, 18, 19, 20)
+        const camarasEsperadas = ['17', '18', '19', '20'];
+        
+        // Obtener datos existentes por cámara
+        const datosExistentes = await db.collection('mediciones').aggregate([
             // Filtrar por frigorífico
             { $match: { frigorificoId: frigorificoId } },
             
@@ -46,28 +49,49 @@ router.get('/mediciones', async (req, res) => {
                     lastTimestamp: { $max: '$ts' },
                     totalMeasurements: { $sum: 1 }
                 }
-            },
-            
-            // Ordenar por ID de cámara
-            { $sort: { _id: 1 } },
-            
-            // Proyectar en el formato esperado por el frontend
-            {
-                $project: {
-                    id: '$_id',
-                    name: { $concat: ['Cámara ', '$_id'] },
-                    lastData: {
-                        timestamp: '$lastTimestamp',
-                        data: {
-                            TA1: '$lastMeasurement.temp',
-                            // Agregar otros campos si están disponibles en metadata
-                            PF: { $ifNull: ['$lastMeasurement.metadata.PF', 0] },
-                            Hum: { $ifNull: ['$lastMeasurement.metadata.Hum', 0] }
-                        }
-                    }
-                }
             }
         ]).toArray();
+        
+        // Crear mapa de datos existentes
+        const datosMap = {};
+        datosExistentes.forEach(item => {
+            datosMap[item._id] = item;
+        });
+        
+        // Generar datos para todas las cámaras (con o sin datos)
+        const camarasData = camarasEsperadas.map(camaraId => {
+            const datos = datosMap[camaraId];
+            
+            if (datos) {
+                // Cámara con datos reales
+                return {
+                    id: camaraId,
+                    name: `Cámara ${camaraId}`,
+                    lastData: {
+                        timestamp: datos.lastTimestamp,
+                        data: {
+                            TA1: datos.lastMeasurement.temp || 0,
+                            PF: datos.lastMeasurement.metadata?.PF || 0,
+                            Hum: datos.lastMeasurement.metadata?.Hum || 0
+                        }
+                    }
+                };
+            } else {
+                // Cámara sin datos - mostrar valores por defecto
+                return {
+                    id: camaraId,
+                    name: `Cámara ${camaraId}`,
+                    lastData: {
+                        timestamp: new Date(),
+                        data: {
+                            TA1: 0,
+                            PF: 0,
+                            Hum: 0
+                        }
+                    }
+                };
+            }
+        });
 
         if (camarasData.length === 0) {
             console.log('⚠️ No se encontraron mediciones en la colección mediciones');
@@ -102,6 +126,12 @@ router.get('/mediciones/camera/:cam/dates', async (req, res) => {
             frigorificoId = frigorifico._id;
         }
 
+        // Verificar si la cámara está en la lista de cámaras válidas
+        const camarasValidas = ['17', '18', '19', '20'];
+        if (!camarasValidas.includes(camaraId)) {
+            return res.status(404).json({ msg: 'Cámara no válida' });
+        }
+        
         // Verificar si existen mediciones para esta cámara
         const exists = await db.collection('mediciones').findOne({
             frigorificoId: frigorificoId,
@@ -109,7 +139,8 @@ router.get('/mediciones/camera/:cam/dates', async (req, res) => {
         });
         
         if (!exists) {
-            return res.status(404).json({ msg: 'Cámara no existe o sin datos' });
+            // Para cámaras sin datos, devolver array vacío
+            return res.json([]);
         }
 
         // Agrupar por fecha
@@ -168,14 +199,21 @@ router.get('/mediciones/camera/:cam', async (req, res) => {
             frigorificoId = frigorifico._id;
         }
 
-        // Verificar si existe la cámara
+        // Verificar si la cámara está en la lista de cámaras válidas
+        const camarasValidas = ['17', '18', '19', '20'];
+        if (!camarasValidas.includes(camaraId)) {
+            return res.status(404).json({ msg: 'Cámara no válida' });
+        }
+        
+        // Verificar si existe la cámara en datos
         const exists = await db.collection('mediciones').findOne({
             frigorificoId: frigorificoId,
             camaraId: camaraId
         });
         
         if (!exists) {
-            return res.status(404).json({ msg: 'Cámara no existe' });
+            // Para cámaras sin datos, devolver estructura vacía
+            return res.json({ docs: [] });
         }
 
         // Construir filtro
