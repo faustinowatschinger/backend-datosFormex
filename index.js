@@ -7,6 +7,7 @@ const mongoose = require('mongoose');
 const authRoutes = require('./auth/router-auth');
 const formexRoutes = require('./db-server/router-formex');
 const medicionesRoutes = require('./db-server/router-mediciones');
+const medicionesFrontendRoutes = require('./db-server/router-mediciones-frontend');
 const { connectUsersDB, getUsersConnection } = require('./auth/db-users');
 const { connectFormexDB, getFormexConnection } = require('./db-server/db-formex');
 
@@ -37,6 +38,8 @@ app.use((req, res, next) => {
 // Rutas
 app.use('/api/auth', authRoutes);
 app.use('/api', medicionesRoutes); // Nuevas rutas para mediciones (sin autenticación JWT)
+
+// Rutas para frontend con autenticación JWT
 app.use('/api/data', async (req, res, next) => {
     try {
         const authHeader = req.headers.authorization;
@@ -67,7 +70,7 @@ app.use('/api/data', async (req, res, next) => {
             error: error.message 
         });
     }
-}, formexRoutes);
+}, medicionesFrontendRoutes); // Cambiar a las nuevas rutas de mediciones
 
 // Manejador de errores mejorado
 app.use((err, req, res, next) => {
