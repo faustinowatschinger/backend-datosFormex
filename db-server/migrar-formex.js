@@ -66,7 +66,7 @@ async function migrarDatosFormex() {
             
             try {
                 const sourceCollection = db.collection(colName);
-                const targetCollection = db.collection('medicions');
+                const targetCollection = db.collection('mediciones');
                 
                 // Obtener documentos de la colección fuente
                 const documentos = await sourceCollection.find({}).toArray();
@@ -151,7 +151,7 @@ async function migrarDatosFormex() {
         console.log(`  📁 Colecciones procesadas: ${formexCollections.length}`);
 
         // Mostrar estadísticas de la colección destino
-        const medicionesCollection = db.collection('medicions');
+        const medicionesCollection = db.collection('mediciones');
         const totalMediciones = await medicionesCollection.countDocuments();
         const medicionesPorCamara = await medicionesCollection.aggregate([
             {

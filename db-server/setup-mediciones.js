@@ -17,7 +17,7 @@ async function setupMedicionesCollection() {
         
         // Crear la colección con validador
         try {
-            await db.createCollection('medicions', {
+            await db.createCollection('mediciones', {
                 validator: {
                     $jsonSchema: {
                         bsonType: "object",
@@ -44,16 +44,16 @@ async function setupMedicionesCollection() {
                     }
                 }
             });
-            console.log('✅ Colección medicions creada con validador');
+            console.log('✅ Colección mediciones creada con validador');
         } catch (error) {
             if (error.code === 48) {
-                console.log('ℹ️ La colección medicions ya existe');
+                console.log('ℹ️ La colección mediciones ya existe');
             } else {
                 throw error;
             }
         }
 
-        const collection = db.collection('medicions');
+        const collection = db.collection('mediciones');
 
         // Crear índices
         console.log('📈 Creando índices...');
@@ -74,7 +74,7 @@ async function setupMedicionesCollection() {
 
         // Mostrar índices existentes
         const indexes = await collection.indexes();
-        console.log('\n📋 Índices en la colección medicions:');
+        console.log('\n📋 Índices en la colección mediciones:');
         indexes.forEach(index => {
             console.log(`  - ${index.name}: ${JSON.stringify(index.key)}`);
         });

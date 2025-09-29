@@ -143,7 +143,7 @@ router.get('/mediciones', resolveFrigorifico, async (req, res) => {
         const skip = parseInt(req.query.skip) || 0;
 
         // Consultar mediciones
-        const mediciones = await db.collection('medicions')
+        const mediciones = await db.collection('mediciones')
             .find(filter)
             .sort({ ts: -1 })
             .limit(limit)
@@ -151,7 +151,7 @@ router.get('/mediciones', resolveFrigorifico, async (req, res) => {
             .toArray();
 
         // Contar total para paginación
-        const total = await db.collection('medicions').countDocuments(filter);
+        const total = await db.collection('mediciones').countDocuments(filter);
 
         res.json({
             data: mediciones,

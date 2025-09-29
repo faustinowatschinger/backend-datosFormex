@@ -34,7 +34,7 @@ router.get('/mediciones', async (req, res) => {
         }
 
         // Agregación para obtener las cámaras con su última medición
-        const camarasData = await db.collection('medicions').aggregate([
+        const camarasData = await db.collection('mediciones').aggregate([
             // Filtrar por frigorífico
             { $match: { frigorificoId: frigorificoId } },
             
@@ -70,7 +70,7 @@ router.get('/mediciones', async (req, res) => {
         ]).toArray();
 
         if (camarasData.length === 0) {
-            console.log('⚠️ No se encontraron mediciones en la colección medicions');
+            console.log('⚠️ No se encontraron mediciones en la colección mediciones');
         }
 
         res.json(camarasData);
@@ -103,7 +103,7 @@ router.get('/mediciones/camera/:cam/dates', async (req, res) => {
         }
 
         // Verificar si existen mediciones para esta cámara
-        const exists = await db.collection('medicions').findOne({
+        const exists = await db.collection('mediciones').findOne({
             frigorificoId: frigorificoId,
             camaraId: camaraId
         });
@@ -113,7 +113,7 @@ router.get('/mediciones/camera/:cam/dates', async (req, res) => {
         }
 
         // Agrupar por fecha
-        const results = await db.collection('medicions').aggregate([
+        const results = await db.collection('mediciones').aggregate([
             // Filtrar por frigorífico y cámara
             { 
                 $match: { 
@@ -169,7 +169,7 @@ router.get('/mediciones/camera/:cam', async (req, res) => {
         }
 
         // Verificar si existe la cámara
-        const exists = await db.collection('medicions').findOne({
+        const exists = await db.collection('mediciones').findOne({
             frigorificoId: frigorificoId,
             camaraId: camaraId
         });
@@ -193,7 +193,7 @@ router.get('/mediciones/camera/:cam', async (req, res) => {
         }
 
         // Consultar mediciones
-        const rawDocs = await db.collection('medicions')
+        const rawDocs = await db.collection('mediciones')
             .find(filter)
             .sort({ ts: 1 }) // Ordenar por timestamp ascendente
             .toArray();
