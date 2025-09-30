@@ -124,12 +124,17 @@ router.get('/mediciones/camera/:cam/dates', async (req, res) => {
 
         let results;
         if (camaraId === 'SalaMaq') {
-            // Sala de Máquinas: agrupar por día calendario local directo
+            // Sala de Máquinas: agrupar por día calendario local directo y contar documentos
             results = await db.collection('medicions').aggregate([
                 { $match: { frigorificoId: frigorificoId, camaraId: camaraId } },
-                { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$ts', timezone: TIMEZONE } } } },
+                { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$ts', timezone: TIMEZONE } }, count: { $sum: 1 } } },
                 { $sort: { '_id': 1 } }
             ]).toArray();
+            // Heurística: si hay más de una fecha y la última sólo tiene 1 registro (medianoche aislada), eliminarla
+            if (results.length > 1) {
+                const firstDate = results[0]._id;
+                results = results.filter(r => r.count > 1 || r._id === firstDate);
+            }
         } else {
             // Cámaras: ciclo 01..23 y luego 00 del siguiente día en el mismo ciclo
             results = await db.collection('medicions').aggregate([
@@ -147,7 +152,7 @@ router.get('/mediciones/camera/:cam/dates', async (req, res) => {
                 { $sort: { '_id': 1 } }
             ]).toArray();
         }
-        const dates = results.map(r => r._id).filter(Boolean);
+    const dates = results.map(r => r._id).filter(Boolean);
         res.json(dates);
         
     } catch (error) {
