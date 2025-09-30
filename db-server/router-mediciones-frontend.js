@@ -145,15 +145,25 @@ router.get('/mediciones/camera/:cam/dates', async (req, res) => {
             return res.json([]);
         }
 
-        // Agrupar por día calendario LOCAL (sin desplazar artificialmente registros a otro día)
-        // Se utiliza la zona horaria específica para evitar que horas >21 se desplacen al "día siguiente" en UTC.
+        // Agrupar por ciclo operativo: 01..23 y luego 00 (la hora 00 pertenece al ciclo del día anterior)
+        // Regla: si hora local == 0, se resta 1 día antes de obtener la fecha para agrupar.
         const results = await db.collection('mediciones').aggregate([
             { $match: { frigorificoId: frigorificoId, camaraId: camaraId } },
             {
-                $group: {
-                    _id: {
-                        $dateToString: { format: '%Y-%m-%d', date: '$ts', timezone: TIMEZONE }
+                $addFields: {
+                    _localHour: { $hour: { date: '$ts', timezone: TIMEZONE } },
+                    _cycleAnchor: {
+                        $cond: {
+                            if: { $eq: [{ $hour: { date: '$ts', timezone: TIMEZONE } }, 0] },
+                            then: { $dateAdd: { startDate: '$ts', unit: 'day', amount: -1 } },
+                            else: '$ts'
+                        }
                     }
+                }
+            },
+            {
+                $group: {
+                    _id: { $dateToString: { format: '%Y-%m-%d', date: '$_cycleAnchor', timezone: TIMEZONE } }
                 }
             },
             { $sort: { '_id': 1 } }
@@ -214,17 +224,16 @@ router.get('/mediciones/camera/:cam', async (req, res) => {
             camaraId: camaraId
         };
 
-        // Si se especifica fecha, filtrar el día calendario local completo (00:00 a 23:59:59.999) en la TZ definida
-        // Necesitamos incluir la hora 00:00 LOCAL de ese mismo día como primera hora (no en el día siguiente).
-        // Estrategia: calcular inicio y fin utilizando desplazamiento fijo -03:00 (Argentina sin DST) y mapear a UTC.
+        // Si se especifica fecha, definimos ciclo: desde las 01:00 locales de ese día hasta < 01:00 locales del día siguiente.
+        // Esto produce una secuencia de horas: 01,02,...,23,00 (midnight local del día siguiente) manteniendo 24 valores.
         if (date) {
             const [yy, mm, dd] = date.split('-').map(Number);
-            // Inicio del día local (00:00 -03) => UTC = 03:00 del mismo día
-            const startUtc = new Date(Date.UTC(yy, mm - 1, dd, 3, 0, 0, 0));
-            // Fin exclusivo: inicio del siguiente día local
-            const endUtcExclusive = new Date(Date.UTC(yy, mm - 1, dd + 1, 3, 0, 0, 0));
+            // 01:00 local => UTC (04:00) porque zona = -03:00
+            const startUtc = new Date(Date.UTC(yy, mm - 1, dd, 4, 0, 0, 0));
+            // 01:00 local del día siguiente => UTC (04:00) siguiente día (exclusivo)
+            const endUtcExclusive = new Date(Date.UTC(yy, mm - 1, dd + 1, 4, 0, 0, 0));
             filter.ts = { $gte: startUtc, $lt: endUtcExclusive };
-            console.log(`📅 Día local ${date} (incluye 00..23) => rango UTC ${startUtc.toISOString()} - ${endUtcExclusive.toISOString()} (excl)`);
+            console.log(`📅 Ciclo ${date} (01..23,00) => rango UTC ${startUtc.toISOString()} - ${endUtcExclusive.toISOString()} (excl)`);
         }
 
         // Consultar mediciones
