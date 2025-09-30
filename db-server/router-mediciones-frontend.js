@@ -30,7 +30,7 @@ router.get('/mediciones', async (req, res) => {
         }
 
         // Obtener últimas mediciones por cámara (todas las que existan)
-        const agregadas = await db.collection('mediciones').aggregate([
+        const agregadas = await db.collection('medicions').aggregate([
             { $match: { frigorificoId } },
             { $sort: { ts: 1 } },
             {
@@ -112,7 +112,7 @@ router.get('/mediciones/camera/:cam/dates', async (req, res) => {
         }
         
         // Verificar si existen mediciones para esta cámara
-        const exists = await db.collection('mediciones').findOne({
+        const exists = await db.collection('medicions').findOne({
             frigorificoId: frigorificoId,
             camaraId: camaraId
         });
@@ -125,14 +125,14 @@ router.get('/mediciones/camera/:cam/dates', async (req, res) => {
         let results;
         if (camaraId === 'SalaMaq') {
             // Sala de Máquinas: agrupar por día calendario local directo
-            results = await db.collection('mediciones').aggregate([
+            results = await db.collection('medicions').aggregate([
                 { $match: { frigorificoId: frigorificoId, camaraId: camaraId } },
                 { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$ts', timezone: TIMEZONE } } } },
                 { $sort: { '_id': 1 } }
             ]).toArray();
         } else {
             // Cámaras: ciclo 01..23 y luego 00 del siguiente día en el mismo ciclo
-            results = await db.collection('mediciones').aggregate([
+            results = await db.collection('medicions').aggregate([
                 { $match: { frigorificoId: frigorificoId, camaraId: camaraId } },
                 { $addFields: {
                     _cycleAnchor: {
@@ -187,7 +187,7 @@ router.get('/mediciones/camera/:cam', async (req, res) => {
         }
         
         // Verificar si existe la cámara en datos
-        const exists = await db.collection('mediciones').findOne({
+        const exists = await db.collection('medicions').findOne({
             frigorificoId: frigorificoId,
             camaraId: camaraId
         });
@@ -221,7 +221,7 @@ router.get('/mediciones/camera/:cam', async (req, res) => {
         }
 
         // Consultar mediciones
-        const rawDocs = await db.collection('mediciones')
+        const rawDocs = await db.collection('medicions')
             .find(filter)
             .sort({ ts: 1 }) // Ordenar por timestamp ascendente
             .toArray();
