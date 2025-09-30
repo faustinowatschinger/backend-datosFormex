@@ -232,7 +232,12 @@ router.get('/mediciones/camera/:cam', async (req, res) => {
         // Derivar lista de variables dinámicas (excluye timestamp) para ayudar al frontend
         const variableSet = new Set();
         docs.forEach(d => Object.keys(d.data || {}).forEach(k => variableSet.add(k)));
-        const variables = Array.from(variableSet).sort();
+        let variables = Array.from(variableSet).sort();
+        if (!variables.length) {
+            // Fallback: intentar inferir desde primera metadata cruda si existiera otro formato
+            const first = rawDocs[0]?.metadata || {};
+            variables = Object.keys(first);
+        }
 
         // Obtener última fecha si no se especificó fecha
         const lastDate = !date && docs.length 
