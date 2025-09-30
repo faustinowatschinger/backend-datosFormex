@@ -215,14 +215,16 @@ router.get('/mediciones/camera/:cam', async (req, res) => {
         };
 
         // Si se especifica fecha, filtrar el día calendario local completo (00:00 a 23:59:59.999) en la TZ definida
+        // Necesitamos incluir la hora 00:00 LOCAL de ese mismo día como primera hora (no en el día siguiente).
+        // Estrategia: calcular inicio y fin utilizando desplazamiento fijo -03:00 (Argentina sin DST) y mapear a UTC.
         if (date) {
             const [yy, mm, dd] = date.split('-').map(Number);
-            // Local midnight (00:00 -03:00) equivale a UTC = 03:00
-            // Construimos rango UTC para abarcar el día local
+            // Inicio del día local (00:00 -03) => UTC = 03:00 del mismo día
             const startUtc = new Date(Date.UTC(yy, mm - 1, dd, 3, 0, 0, 0));
-            const endUtcExclusive = new Date(Date.UTC(yy, mm - 1, dd + 1, 3, 0, 0, 0)); // siguiente día local
+            // Fin exclusivo: inicio del siguiente día local
+            const endUtcExclusive = new Date(Date.UTC(yy, mm - 1, dd + 1, 3, 0, 0, 0));
             filter.ts = { $gte: startUtc, $lt: endUtcExclusive };
-            console.log(`📅 Día local ${date} => rango UTC ${startUtc.toISOString()} - ${endUtcExclusive.toISOString()} (excl)`);
+            console.log(`📅 Día local ${date} (incluye 00..23) => rango UTC ${startUtc.toISOString()} - ${endUtcExclusive.toISOString()} (excl)`);
         }
 
         // Consultar mediciones
