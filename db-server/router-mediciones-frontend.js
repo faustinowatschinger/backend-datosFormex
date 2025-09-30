@@ -122,13 +122,19 @@ router.get('/mediciones/camera/:cam/dates', async (req, res) => {
             return res.json([]);
         }
 
-        // Agrupar por ciclo operativo: 01..23 y luego 00 (la hora 00 pertenece al ciclo del día anterior)
-        // Regla: si hora local == 0, se resta 1 día antes de obtener la fecha para agrupar.
-        const results = await db.collection('mediciones').aggregate([
-            { $match: { frigorificoId: frigorificoId, camaraId: camaraId } },
-            {
-                $addFields: {
-                    _localHour: { $hour: { date: '$ts', timezone: TIMEZONE } },
+        let results;
+        if (camaraId === 'SalaMaq') {
+            // Sala de Máquinas: agrupar por día calendario local directo
+            results = await db.collection('mediciones').aggregate([
+                { $match: { frigorificoId: frigorificoId, camaraId: camaraId } },
+                { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$ts', timezone: TIMEZONE } } } },
+                { $sort: { '_id': 1 } }
+            ]).toArray();
+        } else {
+            // Cámaras: ciclo 01..23 y luego 00 del siguiente día en el mismo ciclo
+            results = await db.collection('mediciones').aggregate([
+                { $match: { frigorificoId: frigorificoId, camaraId: camaraId } },
+                { $addFields: {
                     _cycleAnchor: {
                         $cond: {
                             if: { $eq: [{ $hour: { date: '$ts', timezone: TIMEZONE } }, 0] },
@@ -136,15 +142,11 @@ router.get('/mediciones/camera/:cam/dates', async (req, res) => {
                             else: '$ts'
                         }
                     }
-                }
-            },
-            {
-                $group: {
-                    _id: { $dateToString: { format: '%Y-%m-%d', date: '$_cycleAnchor', timezone: TIMEZONE } }
-                }
-            },
-            { $sort: { '_id': 1 } }
-        ]).toArray();
+                }},
+                { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$_cycleAnchor', timezone: TIMEZONE } } } },
+                { $sort: { '_id': 1 } }
+            ]).toArray();
+        }
         const dates = results.map(r => r._id).filter(Boolean);
         res.json(dates);
         
@@ -201,16 +203,21 @@ router.get('/mediciones/camera/:cam', async (req, res) => {
             camaraId: camaraId
         };
 
-        // Si se especifica fecha, definimos ciclo: desde las 01:00 locales de ese día hasta < 01:00 locales del día siguiente.
-        // Esto produce una secuencia de horas: 01,02,...,23,00 (midnight local del día siguiente) manteniendo 24 valores.
         if (date) {
             const [yy, mm, dd] = date.split('-').map(Number);
-            // 01:00 local => UTC (04:00) porque zona = -03:00
-            const startUtc = new Date(Date.UTC(yy, mm - 1, dd, 4, 0, 0, 0));
-            // 01:00 local del día siguiente => UTC (04:00) siguiente día (exclusivo)
-            const endUtcExclusive = new Date(Date.UTC(yy, mm - 1, dd + 1, 4, 0, 0, 0));
-            filter.ts = { $gte: startUtc, $lt: endUtcExclusive };
-            console.log(`📅 Ciclo ${date} (01..23,00) => rango UTC ${startUtc.toISOString()} - ${endUtcExclusive.toISOString()} (excl)`);
+            if (camaraId === 'SalaMaq') {
+                // Día calendario local completo 00..23
+                const startUtc = new Date(Date.UTC(yy, mm - 1, dd, 3, 0, 0, 0)); // 00 local
+                const endUtcExclusive = new Date(Date.UTC(yy, mm - 1, dd + 1, 3, 0, 0, 0));
+                filter.ts = { $gte: startUtc, $lt: endUtcExclusive };
+                console.log(`📅 SalaMaq día ${date} => UTC ${startUtc.toISOString()} - ${endUtcExclusive.toISOString()} (excl)`);
+            } else {
+                // Ciclo cámaras 01..23 + 00
+                const startUtc = new Date(Date.UTC(yy, mm - 1, dd, 4, 0, 0, 0)); // 01 local
+                const endUtcExclusive = new Date(Date.UTC(yy, mm - 1, dd + 1, 4, 0, 0, 0));
+                filter.ts = { $gte: startUtc, $lt: endUtcExclusive };
+                console.log(`📅 Ciclo cámaras ${date} (01..23,00) => UTC ${startUtc.toISOString()} - ${endUtcExclusive.toISOString()} (excl)`);
+            }
         }
 
         // Consultar mediciones
