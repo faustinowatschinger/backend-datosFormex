@@ -228,7 +228,8 @@ router.get('/mediciones/camera/:cam', async (req, res) => {
             const start = new Date(date);
             const end = new Date(date);
             end.setDate(end.getDate() + 1);
-            filter.ts = { $gte: start, $lt: end };
+            // Usamos $lte para incluir exactamente el registro de las 00:00 del día siguiente si existe
+            filter.ts = { $gte: start, $lte: end };
         }
 
         // Consultar mediciones
