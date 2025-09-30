@@ -18,31 +18,21 @@ const getFormexDb = () => {
 router.get('/mediciones', async (req, res) => {
     try {
         const db = getFormexDb();
-        
-        // Obtener el frigorificoId por defecto (desde env o el primero disponible)
+        // Obtener frigorífico
         let frigorificoId;
         if (process.env.FRIGORIFICO_ID) {
             const { ObjectId } = require('mongodb');
             frigorificoId = new ObjectId(process.env.FRIGORIFICO_ID);
         } else {
-            // Buscar el primer frigorífico disponible
             const frigorifico = await db.collection('frigorificos').findOne({});
-            if (!frigorifico) {
-                return res.status(404).json({ error: 'No hay frigoríficos configurados' });
-            }
+            if (!frigorifico) return res.status(404).json({ error: 'No hay frigoríficos configurados' });
             frigorificoId = frigorifico._id;
         }
 
-        // Lista predefinida de cámaras (17, 18, 19, 20)
-        const camarasEsperadas = ['17', '18', '19', '20'];
-        
-        // Obtener datos existentes por cámara
-        const datosExistentes = await db.collection('mediciones').aggregate([
-            // Filtrar por frigorífico
-            { $match: { frigorificoId: frigorificoId } },
-            // Ordenar ascendente por timestamp para que $last sea realmente la última
+        // Obtener últimas mediciones por cámara (todas las que existan)
+        const agregadas = await db.collection('mediciones').aggregate([
+            { $match: { frigorificoId } },
             { $sort: { ts: 1 } },
-            // Agrupar por cámara y obtener la última medición consistente
             {
                 $group: {
                     _id: '$camaraId',
@@ -51,57 +41,44 @@ router.get('/mediciones', async (req, res) => {
                 }
             }
         ]).toArray();
-        
-        // Crear mapa de datos existentes
-        const datosMap = {};
-        datosExistentes.forEach(item => {
-            datosMap[item._id] = item;
-        });
-        
-        // Generar datos para todas las cámaras (con o sin datos)
-        const camarasData = camarasEsperadas.map(camaraId => {
-            const datos = datosMap[camaraId];
-            
-            if (datos) {
-                // Cámara con datos reales
-                const meta = datos.lastMeasurement.metadata || {};
-                const ta1 = (datos.lastMeasurement.temp != null ? datos.lastMeasurement.temp : meta.TA1);
+
+        // Si queremos garantizar que aparezcan cámaras del 1..20 aunque aún no tengan datos:
+        const baseIds = Array.from({length:20}, (_,i)=> String(i+1));
+        // Añadir especiales
+        baseIds.push('17','18','19','20','SalaMaq'); // 17..20 ya incluidos pero no duplica
+        const uniqueBase = [...new Set(baseIds)];
+
+        const map = Object.fromEntries(agregadas.map(a => [a._id, a]));
+
+        const camarasData = uniqueBase.map(id => {
+            const dato = map[id];
+            if (dato) {
+                const meta = dato.lastMeasurement.metadata || {};
+                const ta1 = (dato.lastMeasurement.temp != null ? dato.lastMeasurement.temp : meta.TA1);
+                const friendly = id === 'SalaMaq' ? 'Sala de Máquinas' : `Cámara ${id}`;
                 return {
-                    id: camaraId,
-                    name: `Cámara ${camaraId}`,
+                    id,
+                    name: friendly,
                     lastData: {
-                        timestamp: datos.lastMeasurement.ts,
-                        data: {
-                            ...meta,
-                            TA1: ta1 != null ? ta1 : 0
-                        }
-                    }
-                };
-            } else {
-                // Cámara sin datos - mostrar valores por defecto
-                return {
-                    id: camaraId,
-                    name: `Cámara ${camaraId}`,
-                    lastData: {
-                        timestamp: new Date(),
-                        data: {
-                            TA1: 0,
-                            PF: 0,
-                            Hum: 0
-                        }
+                        timestamp: dato.lastMeasurement.ts,
+                        data: { ...meta, TA1: ta1 != null ? ta1 : 0 }
                     }
                 };
             }
+            return {
+                id,
+                name: id === 'SalaMaq' ? 'Sala de Máquinas' : `Cámara ${id}`,
+                lastData: {
+                    timestamp: new Date(),
+                    data: { TA1: 0, PF: 0, Hum: 0 }
+                }
+            };
         });
 
-        if (camarasData.length === 0) {
-            console.log('⚠️ No se encontraron mediciones en la colección mediciones');
-        }
-
         res.json(camarasData);
-    } catch (error) {
-        console.error('Error fetching mediciones:', error);
-        res.status(500).json({ error: error.message || 'Error interno del servidor' });
+    } catch (e) {
+        console.error('Error fetching mediciones:', e);
+        res.status(500).json({ error: 'Error interno del servidor' });
     }
 });
 
@@ -129,7 +106,7 @@ router.get('/mediciones/camera/:cam/dates', async (req, res) => {
         }
 
         // Verificar si la cámara está en la lista de cámaras válidas
-        const camarasValidas = ['17', '18', '19', '20'];
+    const camarasValidas = [...Array.from({length:20}, (_,i)=> String(i+1)), 'SalaMaq'];
         if (!camarasValidas.includes(camaraId)) {
             return res.status(404).json({ msg: 'Cámara no válida' });
         }
@@ -202,7 +179,7 @@ router.get('/mediciones/camera/:cam', async (req, res) => {
         }
 
         // Verificar si la cámara está en la lista de cámaras válidas
-        const camarasValidas = ['17', '18', '19', '20'];
+    const camarasValidas = [...Array.from({length:20}, (_,i)=> String(i+1)), 'SalaMaq'];
         if (!camarasValidas.includes(camaraId)) {
             return res.status(404).json({ msg: 'Cámara no válida' });
         }
