@@ -113,6 +113,7 @@ router.get('/mediciones/camera/:cam/dates', async (req, res) => {
     try {
         const db = getFormexDb();
         const camaraId = req.params.cam;
+        const TIMEZONE = 'America/Argentina/Salta'; // Zona horaria local esperada
         
         // Obtener el frigorificoId
         let frigorificoId;
@@ -144,44 +145,20 @@ router.get('/mediciones/camera/:cam/dates', async (req, res) => {
             return res.json([]);
         }
 
-        // Agrupar por ciclos de 24h (basado en fecha del final del ciclo)
+        // Agrupar por día calendario LOCAL (sin desplazar artificialmente registros a otro día)
+        // Se utiliza la zona horaria específica para evitar que horas >21 se desplacen al "día siguiente" en UTC.
         const results = await db.collection('mediciones').aggregate([
-            // Filtrar por frigorífico y cámara
-            { 
-                $match: { 
-                    frigorificoId: frigorificoId,
-                    camaraId: camaraId
-                } 
-            },
-            
-            // Añadir campo para fecha del ciclo (si hora >= 1, mismo día; si hora = 0, ese es el final)
-            {
-                $addFields: {
-                    cycleDate: {
-                        $cond: {
-                            if: { $gte: [{ $hour: "$ts" }, 1] },
-                            then: { $dateAdd: { startDate: "$ts", unit: "day", amount: 1 } },
-                            else: "$ts"
-                        }
-                    }
-                }
-            },
-            
-            // Agrupar por fecha del ciclo
+            { $match: { frigorificoId: frigorificoId, camaraId: camaraId } },
             {
                 $group: {
                     _id: {
-                        $dateToString: { format: "%Y-%m-%d", date: "$cycleDate" }
+                        $dateToString: { format: '%Y-%m-%d', date: '$ts', timezone: TIMEZONE }
                     }
                 }
             },
-            
-            // Ordenar por fecha
-            { $sort: { "_id": 1 } }
+            { $sort: { '_id': 1 } }
         ]).toArray();
-
-        // Extraer solo las fechas
-        const dates = results.map(r => r._id);
+        const dates = results.map(r => r._id).filter(Boolean);
         res.json(dates);
         
     } catch (error) {
@@ -199,6 +176,7 @@ router.get('/mediciones/camera/:cam', async (req, res) => {
         const db = getFormexDb();
         const camaraId = req.params.cam;
         const { date } = req.query; // Fecha opcional en formato YYYY-MM-DD
+        const TIMEZONE = 'America/Argentina/Salta';
         
         // Obtener el frigorificoId
         let frigorificoId;
@@ -236,20 +214,15 @@ router.get('/mediciones/camera/:cam', async (req, res) => {
             camaraId: camaraId
         };
 
-        // Si se especifica fecha, obtener ciclo de 24h: desde 01:00 del día anterior hasta 00:00 del día solicitado
+        // Si se especifica fecha, filtrar el día calendario local completo (00:00 a 23:59:59.999) en la TZ definida
         if (date) {
-            // Día solicitado a las 00:00
-            const dayRequested = new Date(date);
-            // Día anterior a las 01:00 (inicio del ciclo)
-            const cycleStart = new Date(date);
-            cycleStart.setDate(cycleStart.getDate() - 1);
-            cycleStart.setHours(1, 0, 0, 0);
-            // Día solicitado a las 00:00 (fin del ciclo)
-            const cycleEnd = new Date(date);
-            cycleEnd.setHours(0, 0, 0, 0);
-            
-            filter.ts = { $gte: cycleStart, $lte: cycleEnd };
-            console.log(`📅 Buscando ciclo de 24h: ${cycleStart.toISOString()} a ${cycleEnd.toISOString()}`);
+            const [yy, mm, dd] = date.split('-').map(Number);
+            // Local midnight (00:00 -03:00) equivale a UTC = 03:00
+            // Construimos rango UTC para abarcar el día local
+            const startUtc = new Date(Date.UTC(yy, mm - 1, dd, 3, 0, 0, 0));
+            const endUtcExclusive = new Date(Date.UTC(yy, mm - 1, dd + 1, 3, 0, 0, 0)); // siguiente día local
+            filter.ts = { $gte: startUtc, $lt: endUtcExclusive };
+            console.log(`📅 Día local ${date} => rango UTC ${startUtc.toISOString()} - ${endUtcExclusive.toISOString()} (excl)`);
         }
 
         // Consultar mediciones
