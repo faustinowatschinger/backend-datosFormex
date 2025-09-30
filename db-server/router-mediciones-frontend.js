@@ -144,7 +144,7 @@ router.get('/mediciones/camera/:cam/dates', async (req, res) => {
             return res.json([]);
         }
 
-        // Agrupar por fecha
+        // Agrupar por ciclos de 24h (basado en fecha del final del ciclo)
         const results = await db.collection('mediciones').aggregate([
             // Filtrar por frigorífico y cámara
             { 
@@ -154,11 +154,24 @@ router.get('/mediciones/camera/:cam/dates', async (req, res) => {
                 } 
             },
             
-            // Agrupar por día
+            // Añadir campo para fecha del ciclo (si hora >= 1, mismo día; si hora = 0, ese es el final)
+            {
+                $addFields: {
+                    cycleDate: {
+                        $cond: {
+                            if: { $gte: [{ $hour: "$ts" }, 1] },
+                            then: { $dateAdd: { startDate: "$ts", unit: "day", amount: 1 } },
+                            else: "$ts"
+                        }
+                    }
+                }
+            },
+            
+            // Agrupar por fecha del ciclo
             {
                 $group: {
                     _id: {
-                        $dateToString: { format: "%Y-%m-%d", date: "$ts" }
+                        $dateToString: { format: "%Y-%m-%d", date: "$cycleDate" }
                     }
                 }
             },
@@ -223,13 +236,20 @@ router.get('/mediciones/camera/:cam', async (req, res) => {
             camaraId: camaraId
         };
 
-        // Si se especifica fecha, filtrar por rango de día
+        // Si se especifica fecha, obtener ciclo de 24h: desde 01:00 del día anterior hasta 00:00 del día solicitado
         if (date) {
-            const start = new Date(date);
-            const end = new Date(date);
-            end.setDate(end.getDate() + 1);
-            // Usamos $lte para incluir exactamente el registro de las 00:00 del día siguiente si existe
-            filter.ts = { $gte: start, $lte: end };
+            // Día solicitado a las 00:00
+            const dayRequested = new Date(date);
+            // Día anterior a las 01:00 (inicio del ciclo)
+            const cycleStart = new Date(date);
+            cycleStart.setDate(cycleStart.getDate() - 1);
+            cycleStart.setHours(1, 0, 0, 0);
+            // Día solicitado a las 00:00 (fin del ciclo)
+            const cycleEnd = new Date(date);
+            cycleEnd.setHours(0, 0, 0, 0);
+            
+            filter.ts = { $gte: cycleStart, $lte: cycleEnd };
+            console.log(`📅 Buscando ciclo de 24h: ${cycleStart.toISOString()} a ${cycleEnd.toISOString()}`);
         }
 
         // Consultar mediciones
