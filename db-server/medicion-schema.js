@@ -30,6 +30,11 @@ const medicionSchema = new mongoose.Schema({
     temp: {
         type: Number,
         required: false
+    },
+    metadata: {
+        type: mongoose.Schema.Types.Mixed,
+        required: false,
+        description: 'Objeto con todas las variables extraídas del CSV (ServXX:Var)'
     }
 }, {
     timestamps: { createdAt: 'createdAt', updatedAt: 'updatedAt' }

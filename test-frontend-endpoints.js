@@ -1,5 +1,14 @@
 require('dotenv').config();
-const fetch = require('node-fetch');
+// Compatibilidad node-fetch según versión de Node. Usar import dinámico si es ESM.
+let fetchFn;
+try {
+    fetchFn = require('node-fetch');
+    // node-fetch v2 exporta función directamente, v3 exporta como ESM
+    if (fetchFn.default) fetchFn = fetchFn.default;
+} catch (e) {
+    fetchFn = (...args) => import('node-fetch').then(({default: f}) => f(...args));
+}
+const fetch = (...args) => fetchFn(...args);
 
 const API_URL = 'http://localhost:4000/api';
 const TEST_USER = {
@@ -109,6 +118,9 @@ async function testFrontendEndpoints() {
                             if (datosResp.ok) {
                                 const datos = await datosResp.json();
                                 console.log(`✅ Datos obtenidos: ${datos.docs.length} mediciones`);
+                                if (datos.variables) {
+                                    console.log(`   🏷️  Variables detectadas (${datos.variables.length}): ${datos.variables.slice(0,15).join(', ')}${datos.variables.length>15?' ...':''}`);
+                                }
                                 
                                 if (datos.docs.length > 0) {
                                     const primerMedicion = datos.docs[0];

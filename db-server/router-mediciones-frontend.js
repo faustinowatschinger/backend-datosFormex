@@ -40,13 +40,13 @@ router.get('/mediciones', async (req, res) => {
         const datosExistentes = await db.collection('mediciones').aggregate([
             // Filtrar por frigorífico
             { $match: { frigorificoId: frigorificoId } },
-            
-            // Agrupar por cámara y obtener la última medición
+            // Ordenar ascendente por timestamp para que $last sea realmente la última
+            { $sort: { ts: 1 } },
+            // Agrupar por cámara y obtener la última medición consistente
             {
                 $group: {
                     _id: '$camaraId',
                     lastMeasurement: { $last: '$$ROOT' },
-                    lastTimestamp: { $max: '$ts' },
                     totalMeasurements: { $sum: 1 }
                 }
             }
@@ -64,15 +64,16 @@ router.get('/mediciones', async (req, res) => {
             
             if (datos) {
                 // Cámara con datos reales
+                const meta = datos.lastMeasurement.metadata || {};
+                const ta1 = (datos.lastMeasurement.temp != null ? datos.lastMeasurement.temp : meta.TA1);
                 return {
                     id: camaraId,
                     name: `Cámara ${camaraId}`,
                     lastData: {
-                        timestamp: datos.lastTimestamp,
+                        timestamp: datos.lastMeasurement.ts,
                         data: {
-                            TA1: datos.lastMeasurement.temp || 0,
-                            PF: datos.lastMeasurement.metadata?.PF || 0,
-                            Hum: datos.lastMeasurement.metadata?.Hum || 0
+                            ...meta,
+                            TA1: ta1 != null ? ta1 : 0
                         }
                     }
                 };
@@ -237,31 +238,26 @@ router.get('/mediciones/camera/:cam', async (req, res) => {
             .toArray();
 
         // Transformar al formato esperado por el frontend
-        const docs = rawDocs.map(doc => ({
-            timestamp: doc.ts,
-            data: {
-                TA1: doc.temp || 0, // Temperatura principal
-                PF: doc.metadata?.PF || 0,
-                Hum: doc.metadata?.Hum || 0,
-                TA2: doc.metadata?.TA2 || 0,
-                Marchas: doc.metadata?.Marchas || 0,
-                TAux1: doc.metadata?.TAux1 || 0,
-                TAux2: doc.metadata?.TAux2 || 0,
-                TAux3: doc.metadata?.TAux3 || 0,
-                TAux4: doc.metadata?.TAux4 || 0,
-                TGent: doc.metadata?.TGent || 0,
-                TGSal: doc.metadata?.TGSal || 0,
-                CO2: doc.metadata?.CO2 || 0,
-                O2: doc.metadata?.O2 || 0
-            }
-        }));
+        const docs = rawDocs.map(doc => {
+            const meta = doc.metadata || {};
+            const ta1 = (doc.temp != null ? doc.temp : meta.TA1) || 0;
+            return {
+                timestamp: doc.ts,
+                data: { ...meta, TA1: ta1 }
+            };
+        });
+
+        // Derivar lista de variables dinámicas (excluye timestamp) para ayudar al frontend
+        const variableSet = new Set();
+        docs.forEach(d => Object.keys(d.data || {}).forEach(k => variableSet.add(k)));
+        const variables = Array.from(variableSet).sort();
 
         // Obtener última fecha si no se especificó fecha
         const lastDate = !date && docs.length 
             ? docs[docs.length - 1].timestamp.toISOString().slice(0, 10)
             : undefined;
 
-        res.json({ docs, lastDate });
+    res.json({ docs, lastDate, variables });
         
     } catch (error) {
         console.error('Error fetching camera data:', error);
