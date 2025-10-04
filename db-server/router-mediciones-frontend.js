@@ -211,17 +211,19 @@ router.get('/mediciones/camera/:cam', async (req, res) => {
         if (date) {
             const [yy, mm, dd] = date.split('-').map(Number);
             if (camaraId === 'SalaMaq') {
-                // Día calendario local completo 00..23
-                const startUtc = new Date(Date.UTC(yy, mm - 1, dd, 3, 0, 0, 0)); // 00 local
-                const endUtcExclusive = new Date(Date.UTC(yy, mm - 1, dd + 1, 3, 0, 0, 0));
+                // Día calendario local completo 00..23 Argentina
+                // 00:00 Argentina = 03:00 UTC del día anterior, 23:59 Argentina = 02:59 UTC del día siguiente  
+                const startUtc = new Date(Date.UTC(yy, mm - 1, dd - 1, 21, 0, 0, 0)); // 00:00 Argentina del día
+                const endUtcExclusive = new Date(Date.UTC(yy, mm - 1, dd, 21, 0, 0, 0)); // 00:00 Argentina del día siguiente
                 filter.ts = { $gte: startUtc, $lt: endUtcExclusive };
                 console.log(`📅 SalaMaq día ${date} => UTC ${startUtc.toISOString()} - ${endUtcExclusive.toISOString()} (excl)`);
             } else {
-                // Ciclo cámaras 01..23 + 00
-                const startUtc = new Date(Date.UTC(yy, mm - 1, dd, 4, 0, 0, 0)); // 01 local
-                const endUtcExclusive = new Date(Date.UTC(yy, mm - 1, dd + 1, 4, 0, 0, 0));
+                // Ciclo cámaras: desde 01:00 Argentina del día hasta 00:59 Argentina del día siguiente
+                // 01:00 Argentina = 22:00 UTC del día anterior, 00:59 Argentina = 21:59 UTC del mismo día
+                const startUtc = new Date(Date.UTC(yy, mm - 1, dd - 1, 22, 0, 0, 0)); // 01:00 Argentina
+                const endUtcExclusive = new Date(Date.UTC(yy, mm - 1, dd, 22, 0, 0, 0)); // 01:00 Argentina del día siguiente  
                 filter.ts = { $gte: startUtc, $lt: endUtcExclusive };
-                console.log(`📅 Ciclo cámaras ${date} (01..23,00) => UTC ${startUtc.toISOString()} - ${endUtcExclusive.toISOString()} (excl)`);
+                console.log(`📅 Ciclo cámaras ${date} (01..00 Argentina) => UTC ${startUtc.toISOString()} - ${endUtcExclusive.toISOString()} (excl)`);
             }
         }
 
