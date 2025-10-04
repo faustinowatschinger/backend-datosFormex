@@ -46,6 +46,8 @@ router.get('/mediciones', async (req, res) => {
         const baseIds = Array.from({length:20}, (_,i)=> String(i+1));
         // Añadir especiales
         baseIds.push('17','18','19','20','SalaMaq'); // 17..20 ya incluidos pero no duplica
+        // Añadir compresores
+        baseIds.push('Cmp1', 'Cmp2', 'Cmp3', 'Cmp4', 'Cmp5', 'Cmp6');
         const uniqueBase = [...new Set(baseIds)];
 
         const map = Object.fromEntries(agregadas.map(a => [a._id, a]));
@@ -55,10 +57,24 @@ router.get('/mediciones', async (req, res) => {
             if (dato) {
                 const meta = dato.lastMeasurement.metadata || {};
                 const ta1 = (dato.lastMeasurement.temp != null ? dato.lastMeasurement.temp : meta.TA1);
-                const friendly = id === 'SalaMaq' ? 'Sala de Máquinas' : `Cámara ${id}`;
+                
+                // Determinar tipo y nombre
+                let friendly, type;
+                if (id === 'SalaMaq') {
+                    friendly = 'Sala de Máquinas';
+                    type = 'camara';
+                } else if (id.startsWith('Cmp')) {
+                    friendly = `Compresor ${id.replace('Cmp', '')}`;
+                    type = 'compresor';
+                } else {
+                    friendly = `Cámara ${id}`;
+                    type = 'camara';
+                }
+                
                 return {
                     id,
                     name: friendly,
+                    type: type,
                     lastData: {
                         timestamp: dato.lastMeasurement.ts,
                         data: { ...meta, TA1: ta1 != null ? ta1 : 0 }
@@ -67,10 +83,11 @@ router.get('/mediciones', async (req, res) => {
             }
             return {
                 id,
-                name: id === 'SalaMaq' ? 'Sala de Máquinas' : `Cámara ${id}`,
+                name: id === 'SalaMaq' ? 'Sala de Máquinas' : id.startsWith('Cmp') ? `Compresor ${id.replace('Cmp', '')}` : `Cámara ${id}`,
+                type: id === 'SalaMaq' || !id.startsWith('Cmp') ? 'camara' : 'compresor',
                 lastData: {
                     timestamp: new Date(),
-                    data: { TA1: 0, PF: 0, Hum: 0 }
+                    data: id.startsWith('Cmp') ? { PS: 0, PD: 0, TS: 0 } : { TA1: 0, PF: 0, Hum: 0 }
                 }
             };
         });
