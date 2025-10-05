@@ -12,48 +12,103 @@ const getFormexDb = () => {
 };
 
 router.get('/', async (req, res) => {
-    try {        const db = getFormexDb();
-        const collections = await db.db.listCollections().toArray();
-        const camarasData = [];
-
-        for (const collection of collections) {
-            // Manejar cámaras FormexCam
-            if (collection.name.startsWith('FormexCam')) {
-                const data = await db.collection(collection.name)
-                    .find({})
-                    .sort({ timestamp: -1 })
-                    .limit(1)
-                    .toArray();
-                
-                if (data.length > 0) {
-                    camarasData.push({
-                        id: collection.name.replace('FormexCam', ''),
-                        name: `Cámara ${collection.name.replace('FormexCam', '')}`,
-                        type: 'camara',
-                        lastData: data[0]
-                    });
-                }
-            }
-            
-            // Manejar compresores RegistroCmp
-            if (collection.name.startsWith('RegistroCmp')) {
-                const data = await db.collection(collection.name)
-                    .find({})
-                    .sort({ timestamp: -1 })
-                    .limit(1)
-                    .toArray();
-                
-                if (data.length > 0) {
-                    const compId = collection.name.replace('RegistroCmp', '');
-                    camarasData.push({
-                        id: compId,
-                        name: `Compresor ${compId}`,
-                        type: 'compresor',
-                        lastData: data[0]
-                    });
-                }
-            }
+    try {        
+        console.log('🔍 ROUTER FORMEX: Procesando solicitud /data');
+        const db = getFormexDb();
+        
+        // NUEVA LÓGICA: Obtener datos directamente de medicions (donde están todos los datos)
+        console.log('📊 ROUTER FORMEX: Obteniendo datos de medicions...');
+        
+        // Obtener frigorífico
+        let frigorificoId;
+        if (process.env.FRIGORIFICO_ID) {
+            const { ObjectId } = require('mongodb');
+            frigorificoId = new ObjectId(process.env.FRIGORIFICO_ID);
+        } else {
+            const frigorifico = await db.collection('frigorificos').findOne({});
+            frigorificoId = frigorifico ? frigorifico._id : null;
         }
+        
+        if (!frigorificoId) {
+            console.log('❌ ROUTER FORMEX: No hay frigorífico configurado');
+            return res.status(404).json({ error: 'No hay frigoríficos configurados' });
+        }
+        
+        // Obtener últimas mediciones por cámara/compresor
+        const agregadas = await db.collection('medicions').aggregate([
+            { $match: { frigorificoId } },
+            { $sort: { ts: 1 } },
+            {
+                $group: {
+                    _id: '$camaraId',
+                    lastMeasurement: { $last: '$$ROOT' },
+                    totalMeasurements: { $sum: 1 }
+                }
+            }
+        ]).toArray();
+        
+        console.log('📊 ROUTER FORMEX: Agregaciones encontradas:', agregadas.length);
+        
+        // Crear lista base con todos los IDs posibles
+        const baseIds = Array.from({length:20}, (_,i)=> String(i+1));
+        baseIds.push('SalaMaq');
+        baseIds.push('Cmp1', 'Cmp2', 'Cmp3', 'Cmp4', 'Cmp5', 'Cmp6');
+        
+        const map = Object.fromEntries(agregadas.map(a => [a._id, a]));
+        const camarasData = [];
+        
+        // Procesar cada ID
+        baseIds.forEach(id => {
+            const dato = map[id];
+            
+            if (dato) {
+                const meta = dato.lastMeasurement.metadata || {};
+                const ta1 = (dato.lastMeasurement.temp != null ? dato.lastMeasurement.temp : meta.TA1);
+                
+                // Determinar tipo y nombre
+                let friendly, type;
+                if (id === 'SalaMaq') {
+                    friendly = 'Sala de Máquinas';
+                    type = 'camara';
+                } else if (id.startsWith('Cmp')) {
+                    friendly = `Compresor ${id.replace('Cmp', '')}`;
+                    type = 'compresor';
+                } else {
+                    friendly = `Cámara ${id}`;
+                    type = 'camara';
+                }
+                
+                console.log('✅ ROUTER FORMEX: Procesando', friendly, '(' + type + ')');
+                camarasData.push({
+                    id,
+                    name: friendly,
+                    type: type,
+                    lastData: {
+                        timestamp: dato.lastMeasurement.ts,
+                        data: { ...meta, TA1: ta1 != null ? ta1 : 0 }
+                    }
+                });
+            } else {
+                // Sin datos - crear entrada por defecto
+                const name = id === 'SalaMaq' ? 'Sala de Máquinas' : id.startsWith('Cmp') ? `Compresor ${id.replace('Cmp', '')}` : `Cámara ${id}`;
+                const type = id === 'SalaMaq' || !id.startsWith('Cmp') ? 'camara' : 'compresor';
+                
+                camarasData.push({
+                    id,
+                    name,
+                    type,
+                    lastData: {
+                        timestamp: new Date(),
+                        data: id.startsWith('Cmp') ? { PS: 0, PD: 0, TS: 0 } : { TA1: 0, PF: 0, Hum: 0 }
+                    }
+                });
+            }
+        });
+        
+        const cameras = camarasData.filter(item => item.type === 'camara');
+        const compresors = camarasData.filter(item => item.type === 'compresor');
+        
+        console.log('📊 ROUTER FORMEX: Resultado - Cámaras:', cameras.length, ', Compresores:', compresors.length);
 
         if (camarasData.length === 0) {
             console.log('⚠️ No se encontraron colecciones de cámaras');
