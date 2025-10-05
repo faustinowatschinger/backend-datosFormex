@@ -122,10 +122,14 @@ router.get('/mediciones/camera/:cam/dates', async (req, res) => {
             frigorificoId = frigorifico._id;
         }
 
-        // Verificar si la cámara está en la lista de cámaras válidas
-    const camarasValidas = [...Array.from({length:20}, (_,i)=> String(i+1)), 'SalaMaq'];
+        // Verificar si la cámara/compresor está en la lista de IDs válidos conocidos
+        const camarasValidas = [
+            ...Array.from({ length: 20 }, (_, i) => String(i + 1)),
+            'SalaMaq',
+            'Cmp1', 'Cmp2', 'Cmp3', 'Cmp4', 'Cmp5', 'Cmp6'
+        ];
         if (!camarasValidas.includes(camaraId)) {
-            return res.status(404).json({ msg: 'Cámara no válida' });
+            return res.status(404).json({ msg: 'Cámara o compresor no válido' });
         }
         
         // Verificar si existen mediciones para esta cámara
@@ -202,10 +206,14 @@ router.get('/mediciones/camera/:cam', async (req, res) => {
             frigorificoId = frigorifico._id;
         }
 
-        // Verificar si la cámara está en la lista de cámaras válidas
-    const camarasValidas = [...Array.from({length:20}, (_,i)=> String(i+1)), 'SalaMaq'];
+        // Verificar si la cámara/compresor está en la lista de IDs válidos conocidos
+        const camarasValidas = [
+            ...Array.from({ length: 20 }, (_, i) => String(i + 1)),
+            'SalaMaq',
+            'Cmp1', 'Cmp2', 'Cmp3', 'Cmp4', 'Cmp5', 'Cmp6'
+        ];
         if (!camarasValidas.includes(camaraId)) {
-            return res.status(404).json({ msg: 'Cámara no válida' });
+            return res.status(404).json({ msg: 'Cámara o compresor no válido' });
         }
         
         // Verificar si existe la cámara en datos
