@@ -144,7 +144,8 @@ router.get('/mediciones/camera/:cam/dates', async (req, res) => {
         }
 
         let results;
-        if (camaraId === 'SalaMaq') {
+        const isCompresor = camaraId.startsWith('Cmp');
+        if (camaraId === 'SalaMaq' || isCompresor) {
             // Sala de Máquinas: agrupar por día calendario local directo y contar documentos
             results = await db.collection('medicions').aggregate([
                 { $match: { frigorificoId: frigorificoId, camaraId: camaraId } },
@@ -190,7 +191,7 @@ router.get('/mediciones/camera/:cam', async (req, res) => {
     try {
         const db = getFormexDb();
         const camaraId = req.params.cam;
-        const { date } = req.query; // Fecha opcional en formato YYYY-MM-DD
+    const { date } = req.query; // Fecha opcional en formato YYYY-MM-DD
         const TIMEZONE = 'America/Argentina/Salta';
         
         // Obtener el frigorificoId
@@ -235,13 +236,14 @@ router.get('/mediciones/camera/:cam', async (req, res) => {
 
         if (date) {
             const [yy, mm, dd] = date.split('-').map(Number);
-            if (camaraId === 'SalaMaq') {
+            const isCompresor = camaraId.startsWith('Cmp');
+            if (camaraId === 'SalaMaq' || isCompresor) {
                 // Día calendario local completo 00..23 Argentina
                 // 00:00 Argentina = 03:00 UTC del día anterior, 23:59 Argentina = 02:59 UTC del día siguiente  
                 const startUtc = new Date(Date.UTC(yy, mm - 1, dd - 1, 21, 0, 0, 0)); // 00:00 Argentina del día
                 const endUtcExclusive = new Date(Date.UTC(yy, mm - 1, dd, 21, 0, 0, 0)); // 00:00 Argentina del día siguiente
                 filter.ts = { $gte: startUtc, $lt: endUtcExclusive };
-                console.log(`📅 SalaMaq día ${date} => UTC ${startUtc.toISOString()} - ${endUtcExclusive.toISOString()} (excl)`);
+                console.log(`📅 ${camaraId} día ${date} (00..23 Argentina) => UTC ${startUtc.toISOString()} - ${endUtcExclusive.toISOString()} (excl)`);
             } else {
                 // Ciclo cámaras: desde 01:00 Argentina del día hasta 00:59 Argentina del día siguiente
                 // 01:00 Argentina = 22:00 UTC del día anterior, 00:59 Argentina = 21:59 UTC del mismo día
