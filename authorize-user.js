@@ -1,4 +1,4 @@
-const { getUsersConnection } = require('./db-server/db-config');
+require('dotenv').config();
 const { sendAuthorizationResult } = require('./auth/email-service');
 
 async function authorizeUser() {
@@ -38,9 +38,17 @@ async function authorizeUser() {
     console.log(`Acción: ${action}`);
     if (role) console.log(`Rol: ${role}`);
 
+    console.log(`\n🔄 Procesando autorización...`);
+    console.log(`Email: ${email}`);
+    console.log(`Acción: ${action}`);
+    if (role) console.log(`Rol: ${role}`);
+
     // Conectar a la base de datos
-    const db = await getUsersConnection();
-    const User = db.collection('Users');
+    const { connectUsersDB } = require('./auth/db-users');
+    await connectUsersDB();
+    
+    const getUserModel = require('./auth/modelo-user');
+    const User = getUserModel();
 
     // Buscar usuario
     const user = await User.findOne({ email });
@@ -65,7 +73,7 @@ async function authorizeUser() {
       updateData.role = role;
     }
 
-    await User.updateOne({ _id: user._id }, { $set: updateData });
+    await User.findByIdAndUpdate(user._id, updateData);
 
     // Enviar email de notificación
     try {

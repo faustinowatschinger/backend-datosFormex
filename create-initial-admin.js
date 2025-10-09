@@ -1,4 +1,4 @@
-const { getUsersConnection } = require('./db-server/db-config');
+require('dotenv').config();
 const bcrypt = require('bcryptjs');
 
 async function createInitialAdmin() {
@@ -9,8 +9,11 @@ async function createInitialAdmin() {
     console.log('🔧 Creando usuario administrador inicial...');
     
     // Conectar a la base de datos
-    const db = await getUsersConnection();
-    const User = db.collection('Users');
+    const { connectUsersDB } = require('./auth/db-users');
+    await connectUsersDB();
+    
+    const getUserModel = require('./auth/modelo-user');
+    const User = getUserModel();
     
     // Verificar si ya existe
     const existingUser = await User.findOne({ email });
@@ -36,7 +39,7 @@ async function createInitialAdmin() {
       authorizedBy: 'system-init'
     };
     
-    await User.insertOne(adminUser);
+    await User.create(adminUser);
     
     console.log('✅ Usuario administrador creado exitosamente:');
     console.log('📧 Email:', email);

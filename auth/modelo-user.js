@@ -12,7 +12,11 @@ const userSchema = new mongoose.Schema({
   },
   passwordHash: {
     type: String,
-    required: true
+    required: false // Hacer opcional por compatibilidad
+  },
+  password: {
+    type: String,
+    required: false // Campo legacy para usuarios antiguos
   },
   status: {
     type: String,
@@ -35,8 +39,15 @@ const userSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 /* Helper para validar contraseña */
-userSchema.methods.comparePassword = function (plain) {
-  return bcrypt.compare(plain, this.passwordHash);
+userSchema.methods.comparePassword = async function (plain) {
+  // Para usuarios migrados que pueden tener diferentes estructuras
+  if (this.passwordHash) {
+    return await bcrypt.compare(plain, this.passwordHash);
+  } else if (this.password) {
+    // Manejar usuarios con campo password legacy
+    return await bcrypt.compare(plain, this.password);
+  }
+  return false;
 };
 
 let UserModel;

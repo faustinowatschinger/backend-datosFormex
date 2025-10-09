@@ -13,11 +13,12 @@ const connectDB = async () => {
       retryWrites: true,
       maxPoolSize: 50,   // Tamaño máximo del pool de conexiones
       minPoolSize: 5,    // Mantener al menos 5 conexiones abiertas
-      dbName: 'Users'    // Especificar explícitamente la base de datos
+      dbName: 'formex'    // Usar la misma base de datos formex
     };
 
+    // Usar la misma conexión que formex pero apuntando a la colección Users
     usersConnection = await mongoose
-      .createConnection(process.env.MONGODB_URI_USERS, options)
+      .createConnection(process.env.MONGODB_URI, options)
       .asPromise();
     module.exports.usersConnection = usersConnection;
     console.log('✅ MongoDB Users DB conectada');

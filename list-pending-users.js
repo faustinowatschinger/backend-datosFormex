@@ -1,17 +1,21 @@
-const { getUsersConnection } = require('./db-server/db-config');
+// Script para listar usuarios pendientes y todos los usuarios
+require('dotenv').config();
 
 async function listPendingUsers() {
   try {
     console.log('\n🔍 Buscando usuarios pendientes de autorización...\n');
 
     // Conectar a la base de datos
-    const db = await getUsersConnection();
-    const User = db.collection('Users');
+    const { connectUsersDB } = require('./auth/db-users');
+    await connectUsersDB();
+    
+    const getUserModel = require('./auth/modelo-user');
+    const User = getUserModel();
 
     // Obtener usuarios pendientes
     const pendingUsers = await User.find({ status: 'pending' })
       .sort({ createdAt: -1 })
-      .toArray();
+      .lean();
 
     if (pendingUsers.length === 0) {
       console.log('✅ No hay usuarios pendientes de autorización\n');
@@ -50,13 +54,16 @@ async function listAllUsers() {
     console.log('\n👥 Lista de todos los usuarios:\n');
 
     // Conectar a la base de datos
-    const db = await getUsersConnection();
-    const User = db.collection('Users');
+    const { connectUsersDB } = require('./auth/db-users');
+    await connectUsersDB();
+    
+    const getUserModel = require('./auth/modelo-user');
+    const User = getUserModel();
 
     // Obtener todos los usuarios
     const users = await User.find({})
       .sort({ createdAt: -1 })
-      .toArray();
+      .lean();
 
     if (users.length === 0) {
       console.log('📭 No hay usuarios registrados\n');
