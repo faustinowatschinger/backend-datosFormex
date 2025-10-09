@@ -13,6 +13,24 @@ const userSchema = new mongoose.Schema({
   passwordHash: {
     type: String,
     required: true
+  },
+  status: {
+    type: String,
+    enum: ['pending', 'active', 'rejected'],
+    default: 'pending'
+  },
+  role: {
+    type: String,
+    enum: ['3W', 'Global Fresh', 'Formex'],
+    default: null
+  },
+  authorizedBy: {
+    type: String,
+    default: null
+  },
+  authorizedAt: {
+    type: Date,
+    default: null
   }
 }, { timestamps: true });
 
