@@ -28,12 +28,11 @@ router.post('/register',
 
     // Hashear
     const passwordHash = await bcrypt.hash(password, saltRounds);
-    // Por ahora hacer usuarios directamente activos hasta configurar emails
     const newUser = await User.create({ 
       email, 
       passwordHash, 
-      status: 'active', // Cambiar a 'pending' cuando emails estén configurados
-      role: 'Global Fresh' // Rol por defecto
+      status: 'pending' // Usuario queda pendiente hasta autorización
+      // role se asigna cuando se autoriza
     });
 
     // Enviar email de autorización a administradores (opcional)
@@ -46,8 +45,8 @@ router.post('/register',
     }
 
     res.status(201).json({ 
-      msg: 'Usuario registrado exitosamente.',
-      status: 'active'
+      msg: 'Usuario registrado. Espera la autorización de 3W para acceder.',
+      status: 'pending'
     });
   }
 );
