@@ -1,7 +1,27 @@
-const nodemailer = require('nodemailer');
+// Intentar cargar nodemailer, si no está disponible usar versión mock
+let nodemailer;
+try {
+  nodemailer = require('nodemailer');
+} catch (error) {
+  console.warn('⚠️  nodemailer no está instalado. Emails se simularán en consola.');
+  nodemailer = null;
+}
 
 // Configuración del transporter de email
 const createTransporter = () => {
+  if (!nodemailer) {
+    // Mock transporter cuando nodemailer no está disponible
+    return {
+      sendMail: async (mailOptions) => {
+        console.log('📧 [EMAIL SIMULADO]');
+        console.log('Para:', mailOptions.to);
+        console.log('Asunto:', mailOptions.subject);
+        console.log('Contenido:', mailOptions.text || 'HTML content');
+        return { messageId: 'mock-' + Date.now() };
+      }
+    };
+  }
+  
   // Usar variables de entorno para configuración SMTP
   return nodemailer.createTransporter({
     host: process.env.SMTP_HOST || 'smtp.gmail.com',

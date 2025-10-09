@@ -28,20 +28,26 @@ router.post('/register',
 
     // Hashear
     const passwordHash = await bcrypt.hash(password, saltRounds);
-    const newUser = await User.create({ email, passwordHash, status: 'pending' });
+    // Por ahora hacer usuarios directamente activos hasta configurar emails
+    const newUser = await User.create({ 
+      email, 
+      passwordHash, 
+      status: 'active', // Cambiar a 'pending' cuando emails estén configurados
+      role: 'Global Fresh' // Rol por defecto
+    });
 
-    // Enviar email de autorización a administradores
+    // Enviar email de autorización a administradores (opcional)
     try {
       await sendAuthorizationRequest(email, newUser._id);
-      console.log(`Email de autorización enviado para usuario: ${email}`);
+      console.log(`📧 Email de autorización enviado para usuario: ${email}`);
     } catch (error) {
-      console.error('Error enviando email de autorización:', error);
+      console.warn('⚠️  Error enviando email de autorización:', error.message);
       // No fallar el registro si el email falla
     }
 
     res.status(201).json({ 
-      msg: 'Usuario registrado. Espera la autorización de 3W para acceder.',
-      status: 'pending'
+      msg: 'Usuario registrado exitosamente.',
+      status: 'active'
     });
   }
 );
