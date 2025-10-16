@@ -14,11 +14,14 @@ router.post('/register',
   // Validaciones
   body('email').isEmail().normalizeEmail(),
   body('password').isLength({ min: 8 }),
+  body('name').optional().isString().trim().isLength({ min: 2 }).withMessage('Nombre muy corto'),
+  body('phone').optional().isString(),
+  body('company').optional().isString(),
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-    const { email, password } = req.body;
+    const { email, password, name, phone, company } = req.body;
     const User = getUserModel();
 
     // ¿Existe?
@@ -29,7 +32,10 @@ router.post('/register',
     // Hashear
     const passwordHash = await bcrypt.hash(password, saltRounds);
     const newUser = await User.create({ 
+      name,
       email, 
+      phone,
+      company,
       passwordHash, 
       status: 'pending' // Usuario queda pendiente hasta autorización
       // role se asigna cuando se autoriza
@@ -37,7 +43,15 @@ router.post('/register',
 
     // Enviar email de autorización a administradores (opcional)
     try {
-      await sendAuthorizationRequest(email, newUser._id);
+      await sendAuthorizationRequest({
+        id: newUser._id.toString(),
+        email: newUser.email,
+        name: newUser.name,
+        phone: newUser.phone,
+        company: newUser.company,
+        status: newUser.status,
+        createdAt: newUser.createdAt?.toISOString?.() || new Date().toISOString()
+      });
       console.log(`📧 Email de autorización enviado para usuario: ${email}`);
     } catch (error) {
       console.warn('⚠️  Error enviando email de autorización:', error.message);
@@ -159,7 +173,8 @@ router.post('/authorize-user', authenticateToken, requireAdmin, [
       await sendAuthorizationResult(
         user.email, 
         action === 'approve', 
-        action === 'approve' ? role : null
+        action === 'approve' ? role : null,
+        req.user.email
       );
       console.log(`Email de ${action === 'approve' ? 'aprobación' : 'rechazo'} enviado a: ${user.email}`);
     } catch (error) {

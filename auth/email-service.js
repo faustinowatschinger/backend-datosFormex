@@ -14,18 +14,20 @@ const createTransporter = () => {
     return {
       sendMail: async (mailOptions) => {
         console.log('📧 [EMAIL SIMULADO]');
+        console.log('De:', mailOptions.from);
         console.log('Para:', mailOptions.to);
         console.log('Asunto:', mailOptions.subject);
-        console.log('Contenido:', mailOptions.text || 'HTML content');
+        console.log('Texto:', mailOptions.text || '[sin texto]');
+        console.log('HTML:', mailOptions.html ? '[html enviado]' : '[sin html]');
         return { messageId: 'mock-' + Date.now() };
       }
     };
   }
   
   // Usar variables de entorno para configuración SMTP
-  return nodemailer.createTransporter({
+  return nodemailer.createTransport({
     host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: process.env.SMTP_PORT || 587,
+    port: Number(process.env.SMTP_PORT || 587),
     secure: false,
     auth: {
       user: process.env.SMTP_USER,
@@ -34,93 +36,79 @@ const createTransporter = () => {
   });
 };
 
-const adminEmails = [
-  'alejandro@3wsrl.com.ar',
-  'esteban@3wsrl.com.ar',
-  'adolfo@3wsrl.com.ar',
-  'fatiwatschinger@gmail.com'
-];
+// Emails de administradores desde variable de entorno (coma-separado)
+const getAdminEmails = () => {
+  const envList = (process.env.ADMIN_EMAILS || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+  if (envList.length > 0) return envList;
+  // Fallback a lista legacy si no viene por env
+  return [
+    'alejandro@3wsrl.com.ar',
+    'esteban@3wsrl.com.ar',
+    'adolfo@3wsrl.com.ar',
+    'fatiwatschinger@gmail.com'
+  ];
+};
 
-const sendAuthorizationRequest = async (userEmail, userId) => {
+const FROM_EMAIL = process.env.FROM_EMAIL || process.env.SMTP_USER;
+const DASHBOARD_URL = process.env.APP_DASHBOARD_URL || process.env.BASE_URL || 'http://localhost:4000';
+
+// Templates simples para nuevo usuario pendiente
+function newUserPendingHtml(user, dashboardUrl) {
+  const rows = Object.entries(user)
+    .filter(([k]) => k !== 'password' && k !== 'passwordHash')
+    .map(([key, val]) => `<tr><td style="padding:6px 8px"><b>${key}</b></td><td style="padding:6px 8px">${String(val ?? '')}</td></tr>`)
+    .join('');
+
+  return `
+  <div style="font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif">
+    <h2>Nuevo usuario pendiente de verificación</h2>
+    <p>Hay un nuevo registro en estado <b>PENDIENTE</b>. Detalles:</p>
+    <table border="1" cellpadding="0" cellspacing="0" style="border-collapse:collapse">
+      ${rows}
+    </table>
+    <p style="margin-top:16px">
+      Revisalo y verifícalo en el panel:
+      <a href="${dashboardUrl}" target="_blank" rel="noreferrer">${dashboardUrl}</a>
+    </p>
+  </div>`;
+}
+
+function newUserPendingText(user, dashboardUrl) {
+  const lines = Object.entries(user)
+    .filter(([k]) => k !== 'password' && k !== 'passwordHash')
+    .map(([k, v]) => `${k}: ${v ?? ''}`)
+    .join('\n');
+  return `Nuevo usuario pendiente de verificación\n\n${lines}\n\nPanel: ${dashboardUrl}`;
+}
+
+// Enviar aviso a administradores al registrarse un usuario pendiente
+// userInfo: { id, email, name?, phone?, company?, status?, createdAt? }
+const sendAuthorizationRequest = async (userInfo) => {
   const transporter = createTransporter();
-  
-  const baseUrl = process.env.BASE_URL || 'http://localhost:4000';
-  
-  const htmlContent = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <title>Nueva solicitud de autorización - 3W PLC</title>
-      <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: #0087a9; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
-        .content { background: #f9f9f9; padding: 20px; border-radius: 0 0 8px 8px; }
-        .user-info { background: white; padding: 15px; border-radius: 5px; margin: 15px 0; }
-        .buttons { margin: 20px 0; }
-        .btn { 
-          display: inline-block; 
-          padding: 12px 24px; 
-          margin: 8px 4px; 
-          text-decoration: none; 
-          border-radius: 5px;
-          font-weight: bold;
-          text-align: center;
-        }
-        .btn-reject { background: #f44336; color: white; }
-        .btn-3w { background: #2196f3; color: white; }
-        .btn-global { background: #4caf50; color: white; }
-        .btn-formex { background: #ff9800; color: white; }
-        .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #666; }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <div class="header">
-          <h1>Nueva solicitud de autorización</h1>
-          <p>Sistema 3W PLC</p>
-        </div>
-        <div class="content">
-          <p>Se ha registrado un nuevo usuario que requiere autorización:</p>
-          
-          <div class="user-info">
-            <strong>Email del solicitante:</strong> ${userEmail}<br>
-            <strong>Fecha de registro:</strong> ${new Date().toLocaleString('es-AR')}
-          </div>
-          
-          <p>Selecciona el nivel de autorización que deseas otorgar:</p>
-          
-          <div class="buttons">
-            <a href="${baseUrl}/api/auth/authorize/${userId}?action=reject" class="btn btn-reject">
-              ❌ No autorizar
-            </a>
-            <a href="${baseUrl}/api/auth/authorize/${userId}?action=authorize&role=3W" class="btn btn-3w">
-              🔧 Autorizar 3W
-            </a>
-            <a href="${baseUrl}/api/auth/authorize/${userId}?action=authorize&role=Global Fresh" class="btn btn-global">
-              🏢 Autorizar Global Fresh
-            </a>
-            <a href="${baseUrl}/api/auth/authorize/${userId}?action=authorize&role=Formex" class="btn btn-formex">
-              🧊 Autorizar Formex
-            </a>
-          </div>
-          
-          <div class="footer">
-            <p>Este email fue enviado automáticamente por el sistema 3W PLC.</p>
-            <p>Si no reconoces esta solicitud, puedes ignorar este email o contactar al administrador.</p>
-          </div>
-        </div>
-      </div>
-    </body>
-    </html>
-  `;
+  const admins = getAdminEmails();
+
+  const safeInfo = {
+    id: userInfo.id,
+    email: userInfo.email,
+    name: userInfo.name,
+    phone: userInfo.phone,
+    company: userInfo.company,
+    status: userInfo.status,
+    createdAt: userInfo.createdAt || new Date().toISOString()
+  };
+
+  const html = newUserPendingHtml(safeInfo, DASHBOARD_URL);
+  const text = newUserPendingText(safeInfo, DASHBOARD_URL);
 
   const mailOptions = {
-    from: process.env.SMTP_USER,
-    to: adminEmails.join(','),
-    subject: `Nueva solicitud de autorización - ${userEmail}`,
-    html: htmlContent
+    from: FROM_EMAIL,
+    to: admins,
+    subject: '🔔 Nuevo usuario pendiente de verificación',
+    html,
+    text
   };
 
   try {
@@ -135,6 +123,7 @@ const sendAuthorizationRequest = async (userEmail, userId) => {
 
 const sendAuthorizationResult = async (userEmail, authorized, role, authorizedBy) => {
   const transporter = createTransporter();
+  const approvedBy = authorizedBy || 'Administrador';
   
   const htmlContent = `
     <!DOCTYPE html>
@@ -168,14 +157,14 @@ const sendAuthorizationResult = async (userEmail, authorized, role, authorizedBy
             <p>¡Felicitaciones! Tu solicitud de acceso ha sido autorizada.</p>
             <div class="info">
               <strong>Nivel de acceso otorgado:</strong> ${role}<br>
-              <strong>Autorizado por:</strong> ${authorizedBy}<br>
+              <strong>Autorizado por:</strong> ${approvedBy}<br>
               <strong>Fecha:</strong> ${new Date().toLocaleString('es-AR')}
             </div>
             <p>Ya puedes iniciar sesión en la aplicación 3W PLC con tu email y contraseña.</p>
           ` : `
             <p>Lamentablemente, tu solicitud de acceso ha sido rechazada.</p>
             <div class="info">
-              <strong>Rechazado por:</strong> ${authorizedBy}<br>
+              <strong>Rechazado por:</strong> ${approvedBy}<br>
               <strong>Fecha:</strong> ${new Date().toLocaleString('es-AR')}
             </div>
             <p>Si crees que esto es un error, por favor contacta al administrador del sistema.</p>
