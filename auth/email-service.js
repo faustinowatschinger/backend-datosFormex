@@ -69,10 +69,6 @@ function newUserPendingHtml(user, dashboardUrl) {
     <table border="1" cellpadding="0" cellspacing="0" style="border-collapse:collapse">
       ${rows}
     </table>
-    <p style="margin-top:16px">
-      Revisalo y verifícalo en el panel:
-      <a href="${dashboardUrl}" target="_blank" rel="noreferrer">${dashboardUrl}</a>
-    </p>
   </div>`;
 }
 
