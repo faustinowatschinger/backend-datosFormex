@@ -35,7 +35,7 @@ router.get('/mediciones', async (req, res) => {
             frigorificoId = frigorifico._id;
         }
 
-        // Obtener últimas mediciones por cámara (todas las que existan)
+        // Obtener últimas mediciones por cámara (solo las que existan para el frigorífico)
         const agregadas = await db.collection('medicions').aggregate([
             { $match: { frigorificoId } },
             { $sort: { ts: 1 } },
@@ -45,55 +45,35 @@ router.get('/mediciones', async (req, res) => {
                     lastMeasurement: { $last: '$$ROOT' },
                     totalMeasurements: { $sum: 1 }
                 }
-            }
+            },
+            { $sort: { '_id': 1 } }
         ]).toArray();
 
-        // Si queremos garantizar que aparezcan cámaras del 1..20 aunque aún no tengan datos:
-        const baseIds = Array.from({length:20}, (_,i)=> String(i+1));
-        // Añadir especiales
-        baseIds.push('17','18','19','20','SalaMaq'); // 17..20 ya incluidos pero no duplica
-        // Añadir compresores
-        baseIds.push('Cmp1', 'Cmp2', 'Cmp3', 'Cmp4', 'Cmp5', 'Cmp6');
-        const uniqueBase = [...new Set(baseIds)];
+        const camarasData = agregadas.map(dato => {
+            const id = dato._id;
+            const meta = dato.lastMeasurement.metadata || {};
+            const ta1 = (dato.lastMeasurement.temp != null ? dato.lastMeasurement.temp : meta.TA1);
 
-        const map = Object.fromEntries(agregadas.map(a => [a._id, a]));
-
-        const camarasData = uniqueBase.map(id => {
-            const dato = map[id];
-            if (dato) {
-                const meta = dato.lastMeasurement.metadata || {};
-                const ta1 = (dato.lastMeasurement.temp != null ? dato.lastMeasurement.temp : meta.TA1);
-                
-                // Determinar tipo y nombre
-                let friendly, type;
-                if (id === 'SalaMaq') {
-                    friendly = 'Sala de Máquinas';
-                    type = 'camara';
-                } else if (id.startsWith('Cmp')) {
-                    friendly = `Compresor ${id.replace('Cmp', '')}`;
-                    type = 'compresor';
-                } else {
-                    friendly = `Cámara ${id}`;
-                    type = 'camara';
-                }
-                
-                return {
-                    id,
-                    name: friendly,
-                    type: type,
-                    lastData: {
-                        timestamp: dato.lastMeasurement.ts,
-                        data: { ...meta, TA1: ta1 != null ? ta1 : 0 }
-                    }
-                };
+            // Determinar tipo y nombre en base al id
+            let friendly, type;
+            if (id === 'SalaMaq') {
+                friendly = 'Sala de Máquinas';
+                type = 'camara';
+            } else if (typeof id === 'string' && id.startsWith('Cmp')) {
+                friendly = `Compresor ${id.replace('Cmp', '')}`;
+                type = 'compresor';
+            } else {
+                friendly = `Cámara ${id}`;
+                type = 'camara';
             }
+
             return {
                 id,
-                name: id === 'SalaMaq' ? 'Sala de Máquinas' : id.startsWith('Cmp') ? `Compresor ${id.replace('Cmp', '')}` : `Cámara ${id}`,
-                type: id === 'SalaMaq' || !id.startsWith('Cmp') ? 'camara' : 'compresor',
+                name: friendly,
+                type: type,
                 lastData: {
-                    timestamp: new Date(),
-                    data: id.startsWith('Cmp') ? { PS: 0, PD: 0, TS: 0 } : { TA1: 0, PF: 0, Hum: 0 }
+                    timestamp: dato.lastMeasurement.ts,
+                    data: { ...meta, TA1: ta1 != null ? ta1 : 0 }
                 }
             };
         });
@@ -133,16 +113,6 @@ router.get('/mediciones/camera/:cam/dates', async (req, res) => {
             frigorificoId = frigorifico._id;
         }
 
-        // Verificar si la cámara/compresor está en la lista de IDs válidos conocidos
-        const camarasValidas = [
-            ...Array.from({ length: 20 }, (_, i) => String(i + 1)),
-            'SalaMaq',
-            'Cmp1', 'Cmp2', 'Cmp3', 'Cmp4', 'Cmp5', 'Cmp6'
-        ];
-        if (!camarasValidas.includes(camaraId)) {
-            return res.status(404).json({ msg: 'Cámara o compresor no válido' });
-        }
-        
         // Verificar si existen mediciones para esta cámara
         const exists = await db.collection('medicions').findOne({
             frigorificoId: frigorificoId,
@@ -223,16 +193,6 @@ router.get('/mediciones/camera/:cam', async (req, res) => {
             frigorificoId = frigorifico._id;
         }
 
-        // Verificar si la cámara/compresor está en la lista de IDs válidos conocidos
-        const camarasValidas = [
-            ...Array.from({ length: 20 }, (_, i) => String(i + 1)),
-            'SalaMaq',
-            'Cmp1', 'Cmp2', 'Cmp3', 'Cmp4', 'Cmp5', 'Cmp6'
-        ];
-        if (!camarasValidas.includes(camaraId)) {
-            return res.status(404).json({ msg: 'Cámara o compresor no válido' });
-        }
-        
         // Verificar si existe la cámara en datos
         const exists = await db.collection('medicions').findOne({
             frigorificoId: frigorificoId,
