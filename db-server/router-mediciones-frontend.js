@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { getFormexConnection } = require('./db-formex');
+const { ObjectId } = require('mongodb');
 
 // Función helper para obtener la base de datos Formex
 const getFormexDb = () => {
@@ -20,8 +21,13 @@ router.get('/mediciones', async (req, res) => {
         const db = getFormexDb();
         // Obtener frigorífico
         let frigorificoId;
-        if (process.env.FRIGORIFICO_ID) {
-            const { ObjectId } = require('mongodb');
+        if (req.query.frigorificoId) {
+            try {
+                frigorificoId = new ObjectId(String(req.query.frigorificoId));
+            } catch (e) {
+                return res.status(400).json({ error: 'invalid_frigorificoId', message: 'frigorificoId debe ser un ObjectId válido' });
+            }
+        } else if (process.env.FRIGORIFICO_ID) {
             frigorificoId = new ObjectId(process.env.FRIGORIFICO_ID);
         } else {
             const frigorifico = await db.collection('frigorificos').findOne({});
@@ -111,8 +117,13 @@ router.get('/mediciones/camera/:cam/dates', async (req, res) => {
         
         // Obtener el frigorificoId
         let frigorificoId;
-        if (process.env.FRIGORIFICO_ID) {
-            const { ObjectId } = require('mongodb');
+        if (req.query.frigorificoId) {
+            try {
+                frigorificoId = new ObjectId(String(req.query.frigorificoId));
+            } catch (e) {
+                return res.status(400).json({ msg: 'frigorificoId inválido' });
+            }
+        } else if (process.env.FRIGORIFICO_ID) {
             frigorificoId = new ObjectId(process.env.FRIGORIFICO_ID);
         } else {
             const frigorifico = await db.collection('frigorificos').findOne({});
@@ -196,8 +207,13 @@ router.get('/mediciones/camera/:cam', async (req, res) => {
         
         // Obtener el frigorificoId
         let frigorificoId;
-        if (process.env.FRIGORIFICO_ID) {
-            const { ObjectId } = require('mongodb');
+        if (req.query.frigorificoId) {
+            try {
+                frigorificoId = new ObjectId(String(req.query.frigorificoId));
+            } catch (e) {
+                return res.status(400).json({ msg: 'frigorificoId inválido' });
+            }
+        } else if (process.env.FRIGORIFICO_ID) {
             frigorificoId = new ObjectId(process.env.FRIGORIFICO_ID);
         } else {
             const frigorifico = await db.collection('frigorificos').findOne({});
