@@ -138,7 +138,7 @@ router.get('/pending-users', authenticateToken, requireAdmin, async (req, res) =
 router.post('/authorize-user', authenticateToken, requireAdmin, [
   body('userId').notEmpty(),
   body('action').isIn(['approve', 'reject']),
-  body('role').optional().isIn(['3W', 'Global Fresh', 'Formex'])
+  body('role').optional().isIn(['3W', 'Global Fresh', 'Formex', 'Valletana', 'PIN'])
 ], async (req, res) => {
   try {
     const errors = validationResult(req);

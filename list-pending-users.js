@@ -37,7 +37,7 @@ async function listPendingUsers() {
     console.log('   node authorize-user.js <email> approve "<rol>"');
     console.log('   node authorize-user.js <email> reject');
     
-    console.log('\n🎭 Roles disponibles: "3W", "Global Fresh", "Formex"');
+    console.log('\n🎭 Roles disponibles: "3W", "Global Fresh", "Formex", "Valletana", "PIN"');
     console.log('\n💡 Ejemplo:');
     console.log(`   node authorize-user.js ${pendingUsers[0]?.email || 'user@example.com'} approve "3W"`);
 

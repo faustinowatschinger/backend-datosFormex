@@ -40,7 +40,7 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['3W', 'Global Fresh', 'Formex'],
+    enum: ['3W', 'Global Fresh', 'Formex', 'Valletana', 'PIN'],
     default: null
   },
   authorizedBy: {

@@ -8,7 +8,7 @@ async function authorizeUser() {
     if (args.length < 2) {
       console.log('\nUso: node authorize-user.js <email> <action> [role]');
       console.log('Acciones: approve, reject');
-      console.log('Roles (solo para approve): "3W", "Global Fresh", "Formex"');
+      console.log('Roles (solo para approve): "3W", "Global Fresh", "Formex", "Valletana", "PIN"');
       console.log('\nEjemplos:');
       console.log('node authorize-user.js user@example.com approve "3W"');
       console.log('node authorize-user.js user@example.com reject');
@@ -23,13 +23,13 @@ async function authorizeUser() {
     }
 
     if (action === 'approve' && !role) {
-      console.error('❌ Debe especificar un rol para aprobar usuario');
-      console.error('Roles disponibles: "3W", "Global Fresh", "Formex"');
+    console.error('❌ Debe especificar un rol para aprobar usuario');
+    console.error('Roles disponibles: "3W", "Global Fresh", "Formex", "Valletana", "PIN"');
       process.exit(1);
     }
 
-    if (role && !['3W', 'Global Fresh', 'Formex'].includes(role)) {
-      console.error('❌ Rol inválido. Roles disponibles: "3W", "Global Fresh", "Formex"');
+  if (role && !['3W', 'Global Fresh', 'Formex', 'Valletana', 'PIN'].includes(role)) {
+    console.error('❌ Rol inválido. Roles disponibles: "3W", "Global Fresh", "Formex", "Valletana", "PIN"');
       process.exit(1);
     }
 

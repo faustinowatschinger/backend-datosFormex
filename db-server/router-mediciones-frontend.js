@@ -12,6 +12,86 @@ const getFormexDb = () => {
     return conn.useDb('formex');
 };
 
+const FRIGORIFICO_IDS = {
+    formex: '68d832ab99a54fc6573fa28e',
+    valletana: '68d848c499a54fc65743d431',
+    pin: '691f6ba7513350b9eb441c22'
+};
+
+const ROLE_ALLOWED_FRIGOS = {
+    'Global Fresh': ['formex', 'valletana', 'pin'],
+    Formex: ['formex'],
+    Valletana: ['valletana'],
+    PIN: ['pin']
+};
+
+const getAllowedFrigorificoIds = (role) => {
+    if (role === '3W') return null;
+    const keys = ROLE_ALLOWED_FRIGOS[role];
+    if (!keys) return [];
+    return keys.map(key => FRIGORIFICO_IDS[key]).filter(Boolean);
+};
+
+const isAllowedFrigorificoId = (frigorificoId, allowedIds) => {
+    if (!allowedIds) return true;
+    return allowedIds.some(id => String(id) === String(frigorificoId));
+};
+
+const resolveFrigorificoId = async (req, db) => {
+    const allowedIds = getAllowedFrigorificoIds(req.user?.role);
+
+    if (Array.isArray(allowedIds) && allowedIds.length === 0) {
+        return { error: { status: 403, code: 'access_denied', message: 'Rol sin acceso a frigoríficos' } };
+    }
+
+    if (req.query.frigorificoId) {
+        let requestedId;
+        try {
+            requestedId = new ObjectId(String(req.query.frigorificoId));
+        } catch (e) {
+            return {
+                error: {
+                    status: 400,
+                    code: 'invalid_frigorificoId',
+                    message: 'frigorificoId debe ser un ObjectId válido'
+                }
+            };
+        }
+
+        if (!isAllowedFrigorificoId(requestedId, allowedIds)) {
+            return { error: { status: 403, code: 'access_denied', message: 'Acceso denegado al frigorífico solicitado' } };
+        }
+
+        return { frigorificoId: requestedId };
+    }
+
+    if (Array.isArray(allowedIds) && allowedIds.length === 1) {
+        return { frigorificoId: new ObjectId(allowedIds[0]) };
+    }
+
+    if (process.env.FRIGORIFICO_ID) {
+        try {
+            const envId = new ObjectId(process.env.FRIGORIFICO_ID);
+            if (isAllowedFrigorificoId(envId, allowedIds)) {
+                return { frigorificoId: envId };
+            }
+        } catch (e) {
+            // Ignorar FRIGORIFICO_ID inválido y seguir con el fallback.
+        }
+    }
+
+    if (Array.isArray(allowedIds) && allowedIds.length > 1) {
+        return { frigorificoId: new ObjectId(allowedIds[0]) };
+    }
+
+    const frigorifico = await db.collection('frigorificos').findOne({});
+    if (!frigorifico) {
+        return { error: { status: 404, code: 'no_frigorificos', message: 'No hay frigoríficos configurados' } };
+    }
+
+    return { frigorificoId: frigorifico._id };
+};
+
 /**
  * GET /api/data/mediciones - Nueva versión que lee desde la colección mediciones
  * Devuelve un listado de cámaras con su última medición
@@ -19,21 +99,14 @@ const getFormexDb = () => {
 router.get('/mediciones', async (req, res) => {
     try {
         const db = getFormexDb();
-        // Obtener frigorífico
-        let frigorificoId;
-        if (req.query.frigorificoId) {
-            try {
-                frigorificoId = new ObjectId(String(req.query.frigorificoId));
-            } catch (e) {
-                return res.status(400).json({ error: 'invalid_frigorificoId', message: 'frigorificoId debe ser un ObjectId válido' });
-            }
-        } else if (process.env.FRIGORIFICO_ID) {
-            frigorificoId = new ObjectId(process.env.FRIGORIFICO_ID);
-        } else {
-            const frigorifico = await db.collection('frigorificos').findOne({});
-            if (!frigorifico) return res.status(404).json({ error: 'No hay frigoríficos configurados' });
-            frigorificoId = frigorifico._id;
+        const resolved = await resolveFrigorificoId(req, db);
+        if (resolved.error) {
+            return res.status(resolved.error.status).json({
+                error: resolved.error.code,
+                message: resolved.error.message
+            });
         }
+        const { frigorificoId } = resolved;
 
         // Obtener últimas mediciones por cámara (solo las que existan para el frigorífico)
         const agregadas = await db.collection('medicions').aggregate([
@@ -95,23 +168,14 @@ router.get('/mediciones/camera/:cam/dates', async (req, res) => {
         const camaraId = req.params.cam;
         const TIMEZONE = 'America/Argentina/Salta'; // Zona horaria local esperada
         
-        // Obtener el frigorificoId
-        let frigorificoId;
-        if (req.query.frigorificoId) {
-            try {
-                frigorificoId = new ObjectId(String(req.query.frigorificoId));
-            } catch (e) {
-                return res.status(400).json({ msg: 'frigorificoId inválido' });
-            }
-        } else if (process.env.FRIGORIFICO_ID) {
-            frigorificoId = new ObjectId(process.env.FRIGORIFICO_ID);
-        } else {
-            const frigorifico = await db.collection('frigorificos').findOne({});
-            if (!frigorifico) {
-                return res.status(404).json({ msg: 'No hay frigoríficos configurados' });
-            }
-            frigorificoId = frigorifico._id;
+        const resolved = await resolveFrigorificoId(req, db);
+        if (resolved.error) {
+            return res.status(resolved.error.status).json({
+                error: resolved.error.code,
+                message: resolved.error.message
+            });
         }
+        const { frigorificoId } = resolved;
 
         // Verificar si existen mediciones para esta cámara
         const exists = await db.collection('medicions').findOne({
@@ -175,23 +239,14 @@ router.get('/mediciones/camera/:cam', async (req, res) => {
     const { date } = req.query; // Fecha opcional en formato YYYY-MM-DD
         const TIMEZONE = 'America/Argentina/Salta';
         
-        // Obtener el frigorificoId
-        let frigorificoId;
-        if (req.query.frigorificoId) {
-            try {
-                frigorificoId = new ObjectId(String(req.query.frigorificoId));
-            } catch (e) {
-                return res.status(400).json({ msg: 'frigorificoId inválido' });
-            }
-        } else if (process.env.FRIGORIFICO_ID) {
-            frigorificoId = new ObjectId(process.env.FRIGORIFICO_ID);
-        } else {
-            const frigorifico = await db.collection('frigorificos').findOne({});
-            if (!frigorifico) {
-                return res.status(404).json({ msg: 'No hay frigoríficos configurados' });
-            }
-            frigorificoId = frigorifico._id;
+        const resolved = await resolveFrigorificoId(req, db);
+        if (resolved.error) {
+            return res.status(resolved.error.status).json({
+                error: resolved.error.code,
+                message: resolved.error.message
+            });
         }
+        const { frigorificoId } = resolved;
 
         // Verificar si existe la cámara en datos
         const exists = await db.collection('medicions').findOne({
